@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 from urllib.parse import urlparse
 
-from fastapi import HTTPException, Header, Depends, FastAPI
+from fastapi import HTTPException, Header, Depends, FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from settings import ML_TOKEN
 from PIL import Image
@@ -47,6 +47,8 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: str
 
+class URLRequest(BaseModel):
+    url: str
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
@@ -64,10 +66,12 @@ def verify_ml_token(ml_token: Optional[str] = Header(None)):
 
 @app.post("/scan", response_model=MLResponse)
 async def start(
-    url: str,
+    request_data: URLRequest = Body(...),
     token_verified: bool = Depends(verify_ml_token)
 ):
     start_time = time.time()
+    url = request_data.url
+
     try:
         if not url.startswith("http"):
             raise HTTPException(status_code=400, detail="Invalid MinIO URL format")
