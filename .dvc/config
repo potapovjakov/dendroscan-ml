@@ -1,0 +1,7 @@
+[core]
+    remote = clouds3
+['remote "clouds3"']
+    url = s3://bucket-ml
+    endpointurl = https://s3.cloud.ru
+    region = ru-central-1
+    use_ssl = true
