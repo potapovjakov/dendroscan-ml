@@ -1,17 +1,15 @@
-import os
 import time
 from datetime import datetime
+from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import HTTPException, Header, Depends, FastAPI, Body
+from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+from schemas.schemas import HealthResponse, MLResponse, URLRequest
 from settings import ML_TOKEN
-from PIL import Image
-from typing import Optional
-
-from pydantic import BaseModel
-
-from s3_util import download_file
+from utils.predict_util import get_plant_predict, get_predict
+from utils.s3_util import download_file
 
 app = FastAPI()
 
@@ -31,24 +29,6 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-class MLResponse(BaseModel):
-    type: str
-    file_type: str
-    width: float
-    height: float
-    file_size: float
-    trunk_root: bool
-    hollow: bool
-    crack: bool
-    processing_time: float
-
-
-class HealthResponse(BaseModel):
-    status: str
-    timestamp: str
-
-class URLRequest(BaseModel):
-    url: str
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
@@ -69,50 +49,24 @@ async def start(
     request_data: URLRequest = Body(...),
     token_verified: bool = Depends(verify_ml_token)
 ):
-    start_time = time.time()
     url = request_data.url
-
+    request_id = request_data.request_id
     try:
         if not url.startswith("http"):
-            raise HTTPException(status_code=400, detail="Invalid MinIO URL format")
+            raise HTTPException(status_code=400, detail="Invalid S3 URL format")
         parsed_url = urlparse(url)
         path_parts = parsed_url.path.lstrip('/').split('/')
         if len(path_parts) < 2:
-            raise HTTPException(status_code=400, detail="Invalid MinIO URL format")
+            raise HTTPException(status_code=400, detail="Invalid S3 URL format")
 
-        key = '/'.join(path_parts[1:])
+        img_bytes = download_file(url)
+        plant = get_predict(img_bytes, request_id)
 
-        file_content = download_file(url)
-        file_size = len(file_content)
-        file_extension = os.path.splitext(key)[1].lower().replace('.', '')
 
-        width, height = 0, 0
-        if file_extension in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff']:
-            try:
-                # Создаем временный файл в памяти с помощью BytesIO
-                from io import BytesIO
-                image_stream = BytesIO(file_content)
-                with Image.open(image_stream) as img:
-                    width, height = img.size
-                    if img.format:
-                        file_extension = img.format.lower()
-            except Exception as img_error:
-                raise HTTPException(status_code=400, detail=f"Invalid image file: {str(img_error)}")
-            processing_time = time.time() - start_time  # Конец замера времени
+        return MLResponse(
+            request_id=request_data.id,
+        )
 
-            return MLResponse(
-                type="chestnut",
-                trunk_root=True,
-                hollow=False,
-                crack=True,
-                file_type=file_extension,
-                width=width,
-                height=height,
-                file_size=file_size,
-                processing_time=round(processing_time, 4),
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Images only")
 
     except HTTPException:
         raise
