@@ -1,9 +1,10 @@
-import boto3
-from botocore.exceptions import ClientError
-from settings import AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_ENDPOINT_URL, \
-    AWS_REGION_NAME, S3_BUCKET_NAME
 from urllib.parse import urlparse
 
+import boto3
+from botocore.exceptions import ClientError
+
+from settings import (AWS_ACCESS_KEY_ID, AWS_REGION_NAME,
+                      AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME, S3_ENDPOINT_URL)
 
 session = boto3.Session(
     aws_access_key_id=AWS_ACCESS_KEY_ID,
