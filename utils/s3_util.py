@@ -51,14 +51,13 @@ def download_file(file_url: str) -> bytes:
             raise Exception(f"Ошибка при скачивании файла: {e}") from e
 
 
-def upload_file(file_content: bytes, filename: str, content_type: str, request_id: uuid.UUID) -> str:
+def upload_file(file_content: bytes, filename: str, request_id: uuid.UUID) -> str:
     """
     Загружает файл в S3 bucket
 
     Args:
         file_content: Содержимое файла в виде bytes
         filename: Имя файла
-        content_type: MIME-тип содержимого
         request_id: ID запроса
     Returns:
         str: URL загруженного файла
@@ -74,7 +73,6 @@ def upload_file(file_content: bytes, filename: str, content_type: str, request_i
             Bucket=S3_BUCKET_NAME,
             Key=s3_key,
             Body=file_content,
-            ContentType=content_type,
         )
 
         file_url = f"{S3_ENDPOINT_URL}/{S3_BUCKET_NAME}/{s3_key}"

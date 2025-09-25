@@ -45,6 +45,7 @@ class MLResponse(BaseModel):
 class Crop(BaseModel):
     id: int = Field(..., ge=1, description="Идентификатор кропа в пределах одной фотографии")
     crop_bytes: bytes
+    url_image: str
 
 trees_dict: List[Plant] = [
     Plant(id=1, name="Клен остролистный", latin_name="Acer platanoides", plant_type=PlantType.TREE),
