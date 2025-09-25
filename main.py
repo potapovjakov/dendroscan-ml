@@ -1,4 +1,3 @@
-import time
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -7,11 +6,10 @@ from urllib.parse import urlparse
 from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas.schemas import HealthResponse, MLResponse, URLRequest
-from settings import ML_TOKEN
+from schemas.schemas import HealthResponse, MLResponse, MLRequest
+from settings import ML_TOKEN, logger
 from utils.files_utils import jpg_to_bytes
 from utils.predict_util import get_predict
-from utils.s3_util import download_file
 
 app = FastAPI()
 
@@ -48,7 +46,7 @@ def verify_ml_token(ml_token: Optional[str] = Header(None)):
 
 @app.post("/scan", response_model=MLResponse)
 async def start(
-    request_data: URLRequest = Body(...),
+    request_data: MLRequest = Body(...),
     token_verified: bool = Depends(verify_ml_token)
 ):
     url = request_data.url
@@ -65,10 +63,11 @@ async def start(
         if len(path_parts) < 2:
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
 
-        # img_bytes = download_file(url) #Todo Временно ничего не качаем, используем картинки из test_images. В частности главная - start_image.jpeg
-        img_bytes = jpg_to_bytes("test_images/start_image.jpeg")
+        # img_bytes = download_file(url) #Todo Временно ничего не качаем, используем картинки из temp_images. В частности главная - start_image.jpeg
+        img_bytes = jpg_to_bytes("/app/temp_images/start_image.jpeg")
 
         plants = get_predict(img_bytes, request_id)
+
         if plants:
             return MLResponse(
                 plants=plants,

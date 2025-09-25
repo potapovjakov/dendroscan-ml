@@ -1,11 +1,10 @@
-import uuid
 from typing import List
 
 from schemas.schemas import Plant, PlantType, Defect, Crop
 from utils.files_utils import jpg_to_bytes
 
 
-def get_predict(image_content: bytes, request_id: uuid.UUID) -> List[Plant]:
+def get_predict(image_content: bytes, request_id: str) -> List[Plant]:
     """Главная ML функция."""
 
     crops = get_crops_img(image_content)
@@ -14,11 +13,9 @@ def get_predict(image_content: bytes, request_id: uuid.UUID) -> List[Plant]:
         plant = get_plant_predict(crop.crop_bytes, crop.id)
         if plant:
             plants.append(plant)
-            defect_list = []
             defect = get_defects_predict(crop)
             if defect:
-                defect_list.append(defect)
-                plant.defects = defect_list
+                plant.defects = defect
     return plants
 
 def get_crops_img(image_content: bytes) -> List[Crop]:
@@ -26,8 +23,8 @@ def get_crops_img(image_content: bytes) -> List[Crop]:
     Функция должна принять исходное фото и вернуть список с кропами и id всех найденных растений.
     #Todo Пока возвражает захардкоженные кропы
     """
-    crop_2_bytes = jpg_to_bytes("test_images/listvennica_crop.png")
-    crop_22_bytes = jpg_to_bytes("test_images/kust_crop.png")
+    crop_2_bytes = jpg_to_bytes("/app/temp_images/listvennica_crop.png")
+    crop_22_bytes = jpg_to_bytes("/app/temp_images/kust_crop.png")
     #Todo Сделать выгрузку кропов в S3
 
     crop_1 = Crop(

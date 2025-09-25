@@ -1,5 +1,3 @@
-import uuid
-from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
@@ -10,8 +8,10 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: str
 
-class URLRequest(BaseModel):
+class MLRequest(BaseModel):
     url: str
+    request_id: str
+    user_id: str
 
 class PlantType(str, Enum):
     """Тип растения"""

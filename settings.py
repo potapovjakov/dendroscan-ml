@@ -1,7 +1,9 @@
+import logging
 import os
 
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
 load_dotenv()
 
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")

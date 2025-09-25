@@ -1,4 +1,3 @@
-import logging
 import uuid
 from urllib.parse import urlparse
 
@@ -7,9 +6,10 @@ from botocore.exceptions import ClientError
 from fastapi import HTTPException
 
 from settings import (AWS_ACCESS_KEY_ID, AWS_REGION_NAME,
-                      AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME, S3_ENDPOINT_URL)
+                      AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME, S3_ENDPOINT_URL,
+                      logger)
 
-logger = logging.getLogger(__name__)
+
 
 session = boto3.Session(
     aws_access_key_id=AWS_ACCESS_KEY_ID,
