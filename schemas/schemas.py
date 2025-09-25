@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
@@ -39,14 +40,13 @@ class Plant(BaseModel):
 
 class MLResponse(BaseModel):
     """Ответ ML-сервиса на запрос анализа изображения"""
-    id: uuid.UUID
-    request_id: uuid.UUID
+    ml_request_id: uuid.UUID
     plants: List[Plant]
-    created_at: str = Field(..., description="Временная метка создания ответа")
+    created_at: datetime = Field(..., description="Временная метка создания ответа")
 
 class Crop(BaseModel):
     id: int = Field(..., ge=1, description="Идентификатор кропа в пределах одной фотографии")
-    crop: bytes
+    crop_bytes: bytes
 
 trees_dict: List[Plant] = [
     Plant(id=1, name="Клен остролистный", latin_name="Acer platanoides", plant_type=PlantType.TREE),

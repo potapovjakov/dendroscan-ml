@@ -1,4 +1,5 @@
 import time
+import uuid
 from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
@@ -8,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from schemas.schemas import HealthResponse, MLResponse, URLRequest
 from settings import ML_TOKEN
-from utils.predict_util import get_plant_predict, get_predict
+from utils.files_utils import jpg_to_bytes
+from utils.predict_util import get_predict
 from utils.s3_util import download_file
 
 app = FastAPI()
@@ -51,6 +53,10 @@ async def start(
 ):
     url = request_data.url
     request_id = request_data.request_id
+    user_id = request_data.user_id
+    # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
+    ml_request_id = uuid.UUID("666a84e2-3523-47fd-8e88-21517f12428d")
+
     try:
         if not url.startswith("http"):
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
@@ -59,13 +65,16 @@ async def start(
         if len(path_parts) < 2:
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
 
-        img_bytes = download_file(url)
-        plant = get_predict(img_bytes, request_id)
+        # img_bytes = download_file(url) #Todo Временно ничего не качаем, используем картинки из test_images. В частности главная - start_image.jpeg
+        img_bytes = jpg_to_bytes("test_images/start_image.jpeg")
 
-
-        return MLResponse(
-            request_id=request_data.id,
-        )
+        plants = get_predict(img_bytes, request_id)
+        if plants:
+            return MLResponse(
+                plants=plants,
+                ml_request_id=ml_request_id,
+                created_at=datetime.now()
+            )
 
 
     except HTTPException:
