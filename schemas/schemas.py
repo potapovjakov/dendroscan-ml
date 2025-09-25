@@ -40,9 +40,7 @@ class Plant(BaseModel):
 
 class MLResponse(BaseModel):
     """Ответ ML-сервиса на запрос анализа изображения"""
-    ml_request_id: uuid.UUID
     plants: List[Plant]
-    created_at: datetime = Field(..., description="Временная метка создания ответа")
 
 class Crop(BaseModel):
     id: int = Field(..., ge=1, description="Идентификатор кропа в пределах одной фотографии")

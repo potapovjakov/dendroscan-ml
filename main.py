@@ -72,8 +72,6 @@ async def start(
         if plants:
             return MLResponse(
                 plants=plants,
-                ml_request_id=ml_request_id,
-                created_at=datetime.now()
             )
 
 
