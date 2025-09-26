@@ -35,7 +35,7 @@ class Plant(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Уверенность распознавания растения")
     defects: List[Defect] = Field(default_factory=list, description="Список дефектов растения")
     processing_time: float = Field(default=0.0, description="Время обработки")
-
+    crop_url: str = Optional
 
 
 class MLResponse(BaseModel):

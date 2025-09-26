@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from schemas.schemas import HealthResponse, MLResponse, MLRequest
 from settings import ML_TOKEN, logger
-from utils.files_utils import jpg_to_bytes
+from utils.files_utils import get_image_bytes
 from utils.predict_util import get_predict
 
 app = FastAPI()
@@ -49,8 +49,10 @@ async def start(
     request_data: MLRequest = Body(...),
     token_verified: bool = Depends(verify_ml_token)
 ):
-    url = request_data.url
     request_id = request_data.request_id
+    logger.info(f"Получен новый запрос {request_id}")
+    # url = request_data.url ToDo Временно хардкодим
+    url = "https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88-21517f12428d/listv%2Bkust.jpeg"
     user_id = request_data.user_id
     # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
     ml_request_id = uuid.UUID("666a84e2-3523-47fd-8e88-21517f12428d")
@@ -63,8 +65,7 @@ async def start(
         if len(path_parts) < 2:
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
 
-        # img_bytes = download_file(url) #Todo Временно ничего не качаем, используем картинки из temp_images. В частности главная - start_image.jpeg
-        img_bytes = jpg_to_bytes("/app/temp_images/start_image.jpeg")
+        img_bytes = get_image_bytes(url)
 
         plants = get_predict(img_bytes, request_id)
 
