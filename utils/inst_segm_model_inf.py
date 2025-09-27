@@ -5,8 +5,6 @@ import numpy as np
 
 from settings import logger
 
-logger.add("training.log", format="{time} {level} {message}", level="INFO", encoding="utf-8")
-
 
 class ObjectDetector:
     def __init__(self, weights_path: str):
@@ -111,7 +109,7 @@ class ObjectDetector:
 
 # Пример использования
 if __name__ == '__main__':
-    detector = ObjectDetector('best.pt')
+    detector = ObjectDetector('../models/best.pt')
     detector.predict('-5382179392026965625_121.jpg')
 
     logger.info(f"Список ID объектов: {detector.get_object_ids()}")
