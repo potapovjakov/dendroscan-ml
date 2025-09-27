@@ -9,6 +9,9 @@ class HealthResponse(BaseModel):
     timestamp: str
 
 class MLRequest(BaseModel):
+    """
+    Запрос от API сервиса
+    """
     url: str
     request_id: str
     user_id: str
@@ -39,7 +42,8 @@ class Plant(BaseModel):
 
 
 class MLResponse(BaseModel):
-    """Ответ ML-сервиса на запрос анализа изображения"""
+    """Ответ ML-сервиса на запрос анализа изображения, такой же должен
+    ожидать API сервис"""
     plants: List[Plant]
 
 class Crop(BaseModel):
