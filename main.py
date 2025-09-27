@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
@@ -6,7 +5,7 @@ from urllib.parse import urlparse
 from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas.schemas import HealthResponse, MLResponse, MLRequest
+from schemas.schemas import HealthResponse, ScanResponse, MLRequest
 from settings import ML_TOKEN, logger
 from utils.files_utils import get_image_bytes
 from utils.predict_util import get_predict
@@ -44,19 +43,25 @@ def verify_ml_token(ml_token: Optional[str] = Header(None)):
         raise HTTPException(status_code=403, detail="Invalid or missing ML token")
     return True
 
-@app.post("/scan", response_model=MLResponse)
+@app.post("/scan", response_model=ScanResponse)
 async def start(
     request_data: MLRequest = Body(...),
     token_verified: bool = Depends(verify_ml_token)
 ):
     request_id = request_data.request_id
-    logger.info(f"Получен новый запрос {request_id}")
-    # url = request_data.url ToDo Временно хардкодим
-    url = "https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88-21517f12428d/listv%2Bkust.jpeg"
     user_id = request_data.user_id
-    # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
-    ml_request_id = uuid.UUID("666a84e2-3523-47fd-8e88-21517f12428d")
 
+    logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
+                f"{user_id}")
+    fake_img_url = ("https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88"
+           "-21517f12428d/start_image.jpeg")
+    fake_framed_img_url = "https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88-21517f12428d/framed_image.jpeg"
+    url = fake_img_url
+    framed_url = fake_framed_img_url
+    # url = request_data.url ToDo Временно хардкодим
+    # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
+    scan_id = "666a84e2-3523-47fd-8e88-21517f12428d"
+    logger.info(f"Начат процесс сканирования: {scan_id} по URL: {url}")
     try:
         if not url.startswith("http"):
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
@@ -66,13 +71,13 @@ async def start(
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
 
         img_bytes = get_image_bytes(url)
-
-        plants = get_predict(img_bytes, request_id)
-
-        if plants:
-            return MLResponse(
-                plants=plants,
-            )
+        predict = get_predict(img_bytes, request_id)
+        response = ScanResponse(
+            scan_id=scan_id,
+            predict=predict,
+        )
+        logger.info(response.model_dump_json())
+        return response
 
 
     except HTTPException:

@@ -1,10 +1,22 @@
 import logging
 import os
+import sys
 
 from dotenv import load_dotenv
 
+def setup_logging(level=logging.INFO):
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%('
+               'lineno)d] - %(message)s', datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('app.log')
+        ]
+    )
+
+setup_logging()
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 

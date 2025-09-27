@@ -16,6 +16,29 @@ class MLRequest(BaseModel):
     request_id: str
     user_id: str
 
+
+class ScanResponse(BaseModel):
+    """
+    Ответ ML-сервиса на запрос анализа изображения, такой же должен
+    ожидать API сервис"""
+    scan_id: str = Field(description="ID сканирования")
+    predict: "PredictSchema"
+
+
+
+class DetectorSchema(BaseModel):
+    crops: list["Crop"] = []
+    framed_url: Optional[str] = Field(
+        default=None,
+        description="URL изображения с рамками"
+    )
+
+
+class PredictSchema(BaseModel):
+    plants: List["Plant"]
+    framed_url: Optional[str] = Field(description="Исходное фото с рамками")
+
+
 class PlantType(str, Enum):
     """Тип растения"""
     SHRUB = "Кустарник"
@@ -41,10 +64,6 @@ class Plant(BaseModel):
     crop_url: str = Optional
 
 
-class MLResponse(BaseModel):
-    """Ответ ML-сервиса на запрос анализа изображения, такой же должен
-    ожидать API сервис"""
-    plants: List[Plant]
 
 class Crop(BaseModel):
     id: int = Field(..., ge=1, description="Идентификатор кропа в пределах одной фотографии")
