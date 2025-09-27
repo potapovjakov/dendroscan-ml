@@ -6,6 +6,7 @@ from loguru import logger
 
 logger.add("training.log", format="{time} {level} {message}", level="INFO", encoding="utf-8")
 
+
 class ObjectDetector:
     def __init__(self, weights_path: str):
         '''
