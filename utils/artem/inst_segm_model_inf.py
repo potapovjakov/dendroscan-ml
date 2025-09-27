@@ -2,7 +2,9 @@ from ultralytics import YOLO
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+from loguru import logger
 
+logger.add("training.log", format="{time} {level} {message}", level="INFO", encoding="utf-8")
 
 class ObjectDetector:
     def __init__(self, weights_path: str):
@@ -23,7 +25,7 @@ class ObjectDetector:
         self.res = results[0]
 
         if self.res.boxes is None or len(self.res.boxes) == 0:
-            print("Объекты не найдены")
+            logger.info("Объекты не найдены")
             self.objects_info = []
             return None
 
@@ -89,7 +91,7 @@ class ObjectDetector:
         Отображает изображение с разметкой.
         '''
         if not hasattr(self, "labeled_image"):
-            print("Нет результата для отображения. Сначала вызови predict().")
+            logger.info("Нет результата для отображения. Сначала вызови predict().")
             return
 
         plt.figure(figsize=(8, 8), dpi=150)
@@ -110,5 +112,5 @@ if __name__ == '__main__':
     detector = ObjectDetector('best.pt')
     detector.predict('-5382179392026965625_121.jpg')
 
-    print("Список ID объектов:", detector.get_object_ids())
+    logger.info(f"Список ID объектов: {detector.get_object_ids()}")
     detector.show_results()
