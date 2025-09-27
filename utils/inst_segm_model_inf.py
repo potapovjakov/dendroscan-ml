@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 from typing import List, Dict, Any, Union
-
+import torch
 from settings import logger
 
 
@@ -193,29 +193,39 @@ class ObjectDetector:
         return [obj["id"] for obj in self.objects_info]
 
     def get_annotated_image_bytes(self, image_format: str = 'jpg', quality: int = 95) -> bytes:
-        '''
+        """
         Возвращает размеченное изображение с bounding boxes в формате bytes.
+        Если пришёл PNG, конвертирует в JPEG на лету (через PyTorch/NumPy, без PIL).
 
         Args:
-            image_format: формат изображения ('jpg', 'png')
+            image_format: формат исходного изображения ('jpg' или 'png')
             quality: качество для JPEG (0-100)
 
         Returns:
-            bytes: размеченное изображение в формате bytes
-        '''
+            bytes: размеченное изображение в формате JPEG
+        """
         if not hasattr(self, "labeled_image"):
             logger.info("Нет результата для кодирования. Сначала вызовите predict().")
             return b''
 
-        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality] if image_format.lower() == 'jpg' else []
+        img = self.labeled_image  # numpy array, BGR
 
-        if image_format.lower() in ['jpg', 'jpeg']:
-            success, encoded_image = cv2.imencode('.jpg', self.labeled_image, encode_param)
-        elif image_format.lower() == 'png':
-            success, encoded_image = cv2.imencode('.png', self.labeled_image)
-        else:
-            logger.error(f"Неподдерживаемый формат: {image_format}")
-            return b''
+        # Если PNG, перекодируем в JPEG
+        if image_format.lower() == 'png':
+            # Конвертируем в torch tensor
+            img_tensor = torch.from_numpy(img)  # HWC, BGR
+            img_tensor = img_tensor.permute(2, 0, 1).contiguous()  # CHW
+
+            # Можно дополнительно сконвертировать в RGB, если нужно
+            img_tensor = img_tensor[[2, 1, 0], :, :]  # BGR -> RGB
+
+            # Конвертируем обратно в numpy для OpenCV JPEG кодирования
+            img = img_tensor.permute(1, 2, 0).cpu().numpy()  # HWC, RGB
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)  # RGB -> BGR для JPEG
+
+        # Кодируем в JPEG
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        success, encoded_image = cv2.imencode('.jpg', img, encode_param)
 
         if success:
             return encoded_image.tobytes()
