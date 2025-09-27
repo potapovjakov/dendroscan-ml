@@ -6,10 +6,9 @@ from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from schemas.schemas import HealthResponse, ScanResponse, MLRequest
-from settings import ML_TOKEN, logger
+from settings import ML_TOKEN, logger, S3_PUBLIC_BUCKET
 from utils.files_utils import get_image_bytes
 from utils.predict_util import get_predict
-
 app = FastAPI()
 
 app.add_middleware(
@@ -53,12 +52,9 @@ async def start(
 
     logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
                 f"{user_id}")
-    fake_img_url = ("https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88"
-           "-21517f12428d/start_image.jpeg")
-    fake_framed_img_url = "https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88-21517f12428d/framed_image.jpeg"
-    url = fake_img_url
-    framed_url = fake_framed_img_url
-    # url = request_data.url ToDo Временно хардкодим
+    # fake_img_url = "https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88-21517f12428d/start_image.jpeg"
+    # url = fake_img_url
+    url = request_data.url
     # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
     scan_id = "666a84e2-3523-47fd-8e88-21517f12428d"
     logger.info(f"Начат процесс сканирования: {scan_id} по URL: {url}")
@@ -69,8 +65,9 @@ async def start(
         path_parts = parsed_url.path.lstrip('/').split('/')
         if len(path_parts) < 2:
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
-
-        img_bytes = get_image_bytes(url)
+        logger.info(path_parts)
+        public_url = f"{S3_PUBLIC_BUCKET}/{path_parts[1]}/{path_parts[2]}"
+        img_bytes = get_image_bytes(public_url)
         predict = get_predict(img_bytes, request_id)
         response = ScanResponse(
             scan_id=scan_id,

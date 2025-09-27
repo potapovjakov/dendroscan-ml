@@ -125,11 +125,12 @@ class ObjectDetector:
             List[Dict]: список объектов с id, img_crop_bytes и class_id
         '''
         if not hasattr(self, "objects_info") or not self.objects_info:
-            logger.info("Нет результатов детекции. Сначала вызовите predict().")
+            logger.error("Нет результатов детекции. Сначала вызовите predict("
+                        ").")
             return []
 
         if not hasattr(self, "image") or self.image is None:
-            logger.info("Исходное изображение не найдено.")
+            logger.error("Исходное изображение не найдено.")
             return []
 
         objects_with_crops = []
@@ -177,7 +178,8 @@ class ObjectDetector:
         Отображает изображение с разметкой.
         '''
         if not hasattr(self, "labeled_image"):
-            logger.info("Нет результата для отображения. Сначала вызови predict().")
+            logger.error("Нет результата для отображения. Сначала вызови "
+                     "predict().")
             return
 
         plt.figure(figsize=(8, 8), dpi=150)
@@ -204,7 +206,8 @@ class ObjectDetector:
             bytes: размеченное изображение в формате bytes
         '''
         if not hasattr(self, "labeled_image"):
-            logger.info("Нет результата для кодирования. Сначала вызовите predict().")
+            logger.error("Нет результата для кодирования. Сначала вызовите "
+                     "predict().")
             return b''
 
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality] if image_format.lower() == 'jpg' else []
@@ -230,7 +233,6 @@ if __name__ == '__main__':
 
     # Загрузка из файла
     detector.predict('start_image.jpeg')
-    print(detector.objects_info)
     logger.info(f"Список ID объектов: {detector.get_object_ids()}")
 
     # Загрузка из bytes
@@ -240,7 +242,6 @@ if __name__ == '__main__':
     detector.predict(image_bytes)
     objects_with_crops = detector.get_objects_with_crops()
     logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
-
     # Сохранение кропов в файлы
     for obj in objects_with_crops:
         with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
