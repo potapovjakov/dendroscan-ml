@@ -2,6 +2,7 @@ from ultralytics import YOLO
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+from typing import List, Dict, Any, Union
 
 from settings import logger
 
@@ -15,12 +16,38 @@ class ObjectDetector:
         self.model = YOLO(weights_path)
         self.objects_info = []
 
-    def predict(self, image_path: str, imgsz: int = 640, iou: float = 0.6, conf: float = 0.6, verbose: bool = True):
+    def predict(self, image_input: Union[str, bytes], imgsz: int = 640, iou: float = 0.6, conf: float = 0.6, verbose: bool = True):
         '''
         Запуск инференса модели на изображении.
-        путь до изображения
+
+        Args:
+            image_input: путь до изображения или bytes изображения
+            imgsz: размер изображения для модели
+            iou: порог IoU
+            conf: порог уверенности
+            verbose: вывод информации о процессе
         '''
-        self.image = cv2.imread(image_path)
+        # Загрузка изображения в зависимости от типа входных данных
+        if isinstance(image_input, str):
+            # Вход - путь к файлу
+            self.image = cv2.imread(image_input)
+            if self.image is None:
+                logger.error(f"Не удалось загрузить изображение по пути: {image_input}")
+                return None
+        elif isinstance(image_input, bytes):
+            # Вход - bytes
+            nparr = np.frombuffer(image_input, np.uint8)
+            self.image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if self.image is None:
+                logger.error("Не удалось декодировать изображение из bytes")
+                return None
+        else:
+            logger.error("Неверный тип входных данных. Ожидается str (путь) или bytes")
+            return None
+
+        # Сохраняем оригинальные bytes для возможного повторного использования
+        self.original_input = image_input
+
         results = self.model(self.image, imgsz=imgsz, iou=iou, conf=conf, verbose=verbose)
         self.res = results[0]
 
@@ -86,6 +113,65 @@ class ObjectDetector:
         self.labeled_image = labeled_image
         self.objects_info = objects_info
 
+    def get_objects_with_crops(self, image_format: str = 'jpg', quality: int = 95) -> List[Dict[str, Any]]:
+        '''
+        Возвращает список найденных объектов с обрезанными изображениями в формате bytes.
+
+        Args:
+            image_format: формат изображения ('jpg', 'png')
+            quality: качество для JPEG (0-100)
+
+        Returns:
+            List[Dict]: список объектов с id, img_crop_bytes и class_id
+        '''
+        if not hasattr(self, "objects_info") or not self.objects_info:
+            logger.info("Нет результатов детекции. Сначала вызовите predict().")
+            return []
+
+        if not hasattr(self, "image") or self.image is None:
+            logger.info("Исходное изображение не найдено.")
+            return []
+
+        objects_with_crops = []
+
+        for obj in self.objects_info:
+            # Получаем координаты bounding box
+            x1, y1, x2, y2 = obj["bbox"]
+
+            # Обрезаем изображение по bounding box
+            crop = self.image[y1:y2, x1:x2]
+
+            # Проверяем, что обрезанная область не пустая
+            if crop.size == 0:
+                logger.warning(f"Пустая область для объекта {obj['id']}")
+                continue
+
+            # Кодируем обрезанное изображение в bytes
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality] if image_format.lower() == 'jpg' else []
+
+            if image_format.lower() in ['jpg', 'jpeg']:
+                success, encoded_image = cv2.imencode('.jpg', crop, encode_param)
+            elif image_format.lower() == 'png':
+                success, encoded_image = cv2.imencode('.png', crop)
+            else:
+                logger.error(f"Неподдерживаемый формат: {image_format}")
+                success = False
+
+            if success:
+                img_bytes = encoded_image.tobytes()
+
+                objects_with_crops.append({
+                    "id": obj["id"],
+                    "img_crop_bytes": img_bytes,
+                    "class_id": obj["class_id"],
+                    "class_name": obj.get("class_name", ""),
+                    "bbox": obj["bbox"]
+                })
+            else:
+                logger.error(f"Ошибка кодирования изображения для объекта {obj['id']}")
+
+        return objects_with_crops
+
     def show_results(self):
         '''
         Отображает изображение с разметкой.
@@ -106,11 +192,64 @@ class ObjectDetector:
         '''
         return [obj["id"] for obj in self.objects_info]
 
+    def get_annotated_image_bytes(self, image_format: str = 'jpg', quality: int = 95) -> bytes:
+        '''
+        Возвращает размеченное изображение с bounding boxes в формате bytes.
+
+        Args:
+            image_format: формат изображения ('jpg', 'png')
+            quality: качество для JPEG (0-100)
+
+        Returns:
+            bytes: размеченное изображение в формате bytes
+        '''
+        if not hasattr(self, "labeled_image"):
+            logger.info("Нет результата для кодирования. Сначала вызовите predict().")
+            return b''
+
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality] if image_format.lower() == 'jpg' else []
+
+        if image_format.lower() in ['jpg', 'jpeg']:
+            success, encoded_image = cv2.imencode('.jpg', self.labeled_image, encode_param)
+        elif image_format.lower() == 'png':
+            success, encoded_image = cv2.imencode('.png', self.labeled_image)
+        else:
+            logger.error(f"Неподдерживаемый формат: {image_format}")
+            return b''
+
+        if success:
+            return encoded_image.tobytes()
+        else:
+            logger.error("Ошибка кодирования размеченного изображения")
+            return b''
+
 
 # Пример использования
 if __name__ == '__main__':
     detector = ObjectDetector('../models/best.pt')
-    detector.predict('-5382179392026965625_121.jpg')
 
+    # Загрузка из файла
+    detector.predict('start_image.jpeg')
+    print(detector.objects_info)
     logger.info(f"Список ID объектов: {detector.get_object_ids()}")
+
+    # Загрузка из bytes
+    with open('start_image.jpeg', 'rb') as f:
+        image_bytes = f.read()
+
+    detector.predict(image_bytes)
+    objects_with_crops = detector.get_objects_with_crops()
+    logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
+
+    # Сохранение кропов в файлы
+    for obj in objects_with_crops:
+        with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
+            f.write(obj['img_crop_bytes'])
+        logger.info(f"Сохранен объект {obj['id']}: {obj['class_name']}")
+
+    # Получение размеченного изображения в bytes
+    annotated_image_bytes = detector.get_annotated_image_bytes()
+    with open("annotated_image.jpg", "wb") as f:
+        f.write(annotated_image_bytes)
+
     detector.show_results()
