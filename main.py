@@ -76,7 +76,6 @@ async def start(
             scan_id=scan_id,
             predict=predict,
         )
-        logger.info(response.model_dump_json())
         return response
 
 

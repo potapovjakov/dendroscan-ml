@@ -29,7 +29,6 @@ def get_predict(image_content: bytes, request_id: str) -> PredictSchema:
         plants=plants,
         framed_url=detect.framed_url,
     )
-    logger.info(predict_response)
     return predict_response
 
 def detect_plants(image_content: bytes, request_id) -> DetectorSchema:
