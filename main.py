@@ -1,17 +1,14 @@
-import os
-import time
 from datetime import datetime
+from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import HTTPException, Header, Depends, FastAPI, Body
+from fastapi import Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from settings import ML_TOKEN
-from PIL import Image
-from typing import Optional
 
-from pydantic import BaseModel
-
-from s3_util import download_file
+from schemas.schemas import HealthResponse, ScanResponse, MLRequest
+from settings import ML_TOKEN, logger
+from utils.files_utils import get_image_bytes
+from utils.predict_util import get_predict
 
 app = FastAPI()
 
@@ -31,24 +28,6 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-class MLResponse(BaseModel):
-    type: str
-    file_type: str
-    width: float
-    height: float
-    file_size: float
-    trunk_root: bool
-    hollow: bool
-    crack: bool
-    processing_time: float
-
-
-class HealthResponse(BaseModel):
-    status: str
-    timestamp: str
-
-class URLRequest(BaseModel):
-    url: str
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
@@ -64,55 +43,41 @@ def verify_ml_token(ml_token: Optional[str] = Header(None)):
         raise HTTPException(status_code=403, detail="Invalid or missing ML token")
     return True
 
-@app.post("/scan", response_model=MLResponse)
+@app.post("/scan", response_model=ScanResponse)
 async def start(
-    request_data: URLRequest = Body(...),
+    request_data: MLRequest = Body(...),
     token_verified: bool = Depends(verify_ml_token)
 ):
-    start_time = time.time()
-    url = request_data.url
+    request_id = request_data.request_id
+    user_id = request_data.user_id
 
+    logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
+                f"{user_id}")
+    fake_img_url = ("https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88"
+           "-21517f12428d/start_image.jpeg")
+    fake_framed_img_url = "https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88-21517f12428d/framed_image.jpeg"
+    url = fake_img_url
+    framed_url = fake_framed_img_url
+    # url = request_data.url ToDo Временно хардкодим
+    # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
+    scan_id = "666a84e2-3523-47fd-8e88-21517f12428d"
+    logger.info(f"Начат процесс сканирования: {scan_id} по URL: {url}")
     try:
         if not url.startswith("http"):
-            raise HTTPException(status_code=400, detail="Invalid MinIO URL format")
+            raise HTTPException(status_code=400, detail="Invalid S3 URL format")
         parsed_url = urlparse(url)
         path_parts = parsed_url.path.lstrip('/').split('/')
         if len(path_parts) < 2:
-            raise HTTPException(status_code=400, detail="Invalid MinIO URL format")
+            raise HTTPException(status_code=400, detail="Invalid S3 URL format")
 
-        key = '/'.join(path_parts[1:])
+        img_bytes = get_image_bytes(url)
+        predict = get_predict(img_bytes, request_id)
+        response = ScanResponse(
+            scan_id=scan_id,
+            predict=predict,
+        )
+        return response
 
-        file_content = download_file(url)
-        file_size = len(file_content)
-        file_extension = os.path.splitext(key)[1].lower().replace('.', '')
-
-        width, height = 0, 0
-        if file_extension in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff']:
-            try:
-                # Создаем временный файл в памяти с помощью BytesIO
-                from io import BytesIO
-                image_stream = BytesIO(file_content)
-                with Image.open(image_stream) as img:
-                    width, height = img.size
-                    if img.format:
-                        file_extension = img.format.lower()
-            except Exception as img_error:
-                raise HTTPException(status_code=400, detail=f"Invalid image file: {str(img_error)}")
-            processing_time = time.time() - start_time  # Конец замера времени
-
-            return MLResponse(
-                type="chestnut",
-                trunk_root=True,
-                hollow=False,
-                crack=True,
-                file_type=file_extension,
-                width=width,
-                height=height,
-                file_size=file_size,
-                processing_time=round(processing_time, 4),
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Images only")
 
     except HTTPException:
         raise
