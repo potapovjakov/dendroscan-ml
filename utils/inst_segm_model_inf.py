@@ -19,7 +19,8 @@ class ObjectDetector:
         self.objects_info = []
 
     def predict(self, image_input: Union[str, bytes], imgsz: int = 640,
-                iou: float = INF_IOU, conf: float = INF_CONF, verbose: bool =
+                iou: float = None, conf: float = None,
+                verbose: bool =
                 True):
         '''
         Запуск инференса модели на изображении.
@@ -31,7 +32,14 @@ class ObjectDetector:
             conf: порог уверенности
             verbose: вывод информации о процессе
         '''
+        # Проверка переменных INF_IOU и INF_CONF
+        default_iou = getattr(self, INF_IOU, 0.6)
+        default_conf = getattr(self, INF_CONF, 0.6)
+
+        iou = iou if iou is not None else default_iou
+        conf = conf if conf is not None else default_conf
         # Загрузка изображения в зависимости от типа входных данных
+
         if isinstance(image_input, str):
             # Вход - путь к файлу
             self.image = cv2.imread(image_input)
