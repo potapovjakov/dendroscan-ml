@@ -1,22 +1,50 @@
-from ultralytics import YOLO
-import matplotlib.pyplot as plt
-import cv2
-import numpy as np
-from typing import List, Dict, Any, Union
+import os
+from typing import Any, Dict, List, Union
 
-from settings import logger
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from ultralytics import YOLO
+
+from settings import INF_CONF, INF_IOU, logger
+from utils.files_utils import get_image_bytes
+from pathlib import Path
 
 
 class ObjectDetector:
-    def __init__(self, weights_path: str):
+    def __init__(self, weights_path: str = None):
         '''
         Класс для детекции и сегментации объектов с помощью YOLO.
         путь до весов модели (.pt файл)
         '''
+        # Проверяем модель
+        model_file_name = "best.pt"
+        default_model_path = os.getenv(f'INF_MODEL_PATH', f'./models/{model_file_name}')
+        weights_path = weights_path if weights_path is not None else (
+            default_model_path)
+        model_path = Path(weights_path)
+        if not model_path.exists():
+            alternative_paths = [
+                f"./models/{model_file_name}",
+                f"../models/{model_file_name}",
+                f"/app/models/{model_file_name}"
+            ]
+            for alt_path in alternative_paths:
+                if Path(alt_path).exists():
+                    weights_path = Path(alt_path)
+                    logger.info(f"Модель найдена по альтернативному пути: {alt_path}")
+                    break
+            else:
+                raise FileNotFoundError(f"Модель не найдена. Проверенные пути: {alternative_paths}")
+
         self.model = YOLO(weights_path)
         self.objects_info = []
 
-    def predict(self, image_input: Union[str, bytes], imgsz: int = 640, iou: float = 0.6, conf: float = 0.6, verbose: bool = True):
+    def predict(self, image_input: Union[str, bytes], imgsz: int = 640,
+                iou: float = None, conf: float = None,
+                verbose: bool =
+                False):
         '''
         Запуск инференса модели на изображении.
 
@@ -27,7 +55,14 @@ class ObjectDetector:
             conf: порог уверенности
             verbose: вывод информации о процессе
         '''
+        # Проверка переменных INF_IOU и INF_CONF
+        default_iou = getattr(self, INF_IOU, 0.6)
+        default_conf = getattr(self, INF_CONF, 0.6)
+
+        iou = iou if iou is not None else default_iou
+        conf = conf if conf is not None else default_conf
         # Загрузка изображения в зависимости от типа входных данных
+
         if isinstance(image_input, str):
             # Вход - путь к файлу
             self.image = cv2.imread(image_input)
@@ -195,62 +230,90 @@ class ObjectDetector:
         return [obj["id"] for obj in self.objects_info]
 
     def get_annotated_image_bytes(self, image_format: str = 'jpg', quality: int = 95) -> bytes:
-        '''
+        """
         Возвращает размеченное изображение с bounding boxes в формате bytes.
+        Если пришёл PNG, конвертирует в JPEG на лету (через PyTorch/NumPy, без PIL).
 
         Args:
-            image_format: формат изображения ('jpg', 'png')
+            image_format: формат исходного изображения ('jpg' или 'png')
             quality: качество для JPEG (0-100)
 
         Returns:
-            bytes: размеченное изображение в формате bytes
-        '''
+            bytes: размеченное изображение в формате JPEG
+        """
         if not hasattr(self, "labeled_image"):
             logger.error("Нет результата для кодирования. Сначала вызовите "
                      "predict().")
             return b''
 
-        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality] if image_format.lower() == 'jpg' else []
+        img = self.labeled_image  # numpy array, BGR
 
-        if image_format.lower() in ['jpg', 'jpeg']:
-            success, encoded_image = cv2.imencode('.jpg', self.labeled_image, encode_param)
-        elif image_format.lower() == 'png':
-            success, encoded_image = cv2.imencode('.png', self.labeled_image)
-        else:
-            logger.error(f"Неподдерживаемый формат: {image_format}")
-            return b''
+        # Если PNG, перекодируем в JPEG
+        if image_format.lower() == 'png':
+            # Конвертируем в torch tensor
+            img_tensor = torch.from_numpy(img)  # HWC, BGR
+            img_tensor = img_tensor.permute(2, 0, 1).contiguous()  # CHW
+
+            # Можно дополнительно сконвертировать в RGB, если нужно
+            img_tensor = img_tensor[[2, 1, 0], :, :]  # BGR -> RGB
+
+            # Конвертируем обратно в numpy для OpenCV JPEG кодирования
+            img = img_tensor.permute(1, 2, 0).cpu().numpy()  # HWC, RGB
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)  # RGB -> BGR для JPEG
+
+        # Кодируем в JPEG
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+        success, encoded_image = cv2.imencode('.jpg', img, encode_param)
 
         if success:
             return encoded_image.tobytes()
         else:
             logger.error("Ошибка кодирования размеченного изображения")
             return b''
-
+#Не пушить раскомментироанным
+# def test_predict():
+#     detect = ObjectDetector()
+#     img_bytes = get_image_bytes("https://dendroscan.s3.cloud.ru/test_image.jpeg")
+#     detect.predict(image_input=img_bytes)
+#     objects = detect.get_objects_with_crops()
+#     assert len(objects) > 1
+#     for obj in objects:
+#         required_keys = {'id', 'img_crop_bytes', 'class_id', 'class_name', 'bbox'}
+#         assert required_keys.issubset(obj.keys()), f"Отсутствуют ключи: {
+#         required_keys - set(obj.keys())}"
+#         assert type(obj["img_crop_bytes"]) == bytes
+#         assert type(obj["class_id"]) == int
+#         assert type(obj["class_name"]) == str
+#         assert type(obj["bbox"]) == list
 
 # Пример использования
-if __name__ == '__main__':
-    detector = ObjectDetector('../models/best.pt')
+# if __name__ == '__main__':
 
-    # Загрузка из файла
-    detector.predict('start_image.jpeg')
-    logger.info(f"Список ID объектов: {detector.get_object_ids()}")
 
-    # Загрузка из bytes
-    with open('start_image.jpeg', 'rb') as f:
-        image_bytes = f.read()
 
-    detector.predict(image_bytes)
-    objects_with_crops = detector.get_objects_with_crops()
-    logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
-    # Сохранение кропов в файлы
-    for obj in objects_with_crops:
-        with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
-            f.write(obj['img_crop_bytes'])
-        logger.info(f"Сохранен объект {obj['id']}: {obj['class_name']}")
 
-    # Получение размеченного изображения в bytes
-    annotated_image_bytes = detector.get_annotated_image_bytes()
-    with open("annotated_image.jpg", "wb") as f:
-        f.write(annotated_image_bytes)
-
-    detector.show_results()
+    # detector = ObjectDetector('../models/best.pt')
+    #
+    # # Загрузка из файла
+    # detector.predict('test_image.jpeg')
+    # logger.info(f"Список ID объектов: {detector.get_object_ids()}")
+    #
+    # # Загрузка из bytes
+    # with open('test_image.jpeg', 'rb') as f:
+    #     image_bytes = f.read()
+    #
+    # detector.predict(image_bytes)
+    # objects_with_crops = detector.get_objects_with_crops()
+    # logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
+    # # Сохранение кропов в файлы
+    # for obj in objects_with_crops:
+    #     with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
+    #         f.write(obj['img_crop_bytes'])
+    #     logger.info(f"Сохранен объект {obj['id']}: {obj['class_name']}")
+    #
+    # # Получение размеченного изображения в bytes
+    # annotated_image_bytes = detector.get_annotated_image_bytes()
+    # with open("annotated_image.jpg", "wb") as f:
+    #     f.write(annotated_image_bytes)
+    #
+    # detector.show_results()

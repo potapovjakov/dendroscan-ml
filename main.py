@@ -52,8 +52,6 @@ async def start(
 
     logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
                 f"{user_id}")
-    # fake_img_url = "https://dendroscan.s3.cloud.ru/777a84e2-3523-47fd-8e88-21517f12428d/start_image.jpeg"
-    # url = fake_img_url
     url = request_data.url
     # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
     scan_id = "666a84e2-3523-47fd-8e88-21517f12428d"
@@ -70,7 +68,7 @@ async def start(
         img_bytes = get_image_bytes(public_url)
         predict = get_predict(img_bytes, request_id)
         response = ScanResponse(
-            scan_id=scan_id,
+            id=scan_id,
             predict=predict,
         )
         return response

@@ -21,7 +21,7 @@ class ScanResponse(BaseModel):
     """
     Ответ ML-сервиса на запрос анализа изображения, такой же должен
     ожидать API сервис"""
-    scan_id: str = Field(description="ID сканирования")
+    id: str = Field(description="ID сканирования")
     predict: "PredictSchema"
 
 
