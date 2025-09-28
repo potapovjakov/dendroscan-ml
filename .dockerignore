@@ -60,3 +60,4 @@ test_*
 tmp/
 temp/
 uploads/
+models/

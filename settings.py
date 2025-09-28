@@ -27,3 +27,7 @@ S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 S3_PUBLIC_BUCKET = os.getenv("S3_PUBLIC_BUCKET")
 ML_TOKEN = os.getenv("ML_TOKEN")
+
+# Параметры ML инференса:
+INF_IOU = os.getenv("INF_IOU", 0.6)
+INF_CONF = os.getenv("INF_CONF", 0.6)

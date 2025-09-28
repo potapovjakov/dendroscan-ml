@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 from typing import List, Dict, Any, Union
+
+from settings import logger, INF_IOU, INF_CONF
 import torch
 from settings import logger
 
@@ -16,8 +18,9 @@ class ObjectDetector:
         self.model = YOLO(weights_path)
         self.objects_info = []
 
-    def predict(self, image_input: Union[str, bytes], imgsz: int = 640, iou: float = 0.6, conf: float = 0.6,
-                verbose: bool = True):
+    def predict(self, image_input: Union[str, bytes], imgsz: int = 640,
+                iou: float = INF_IOU, conf: float = INF_CONF, verbose: bool =
+                True):
         '''
         Запуск инференса модели на изображении.
 
