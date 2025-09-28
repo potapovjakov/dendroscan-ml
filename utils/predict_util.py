@@ -1,3 +1,4 @@
+import random
 from typing import List
 
 from schemas.schemas import (
@@ -6,11 +7,11 @@ from schemas.schemas import (
     Defect,
     Crop,
     PredictSchema,
-    DetectorSchema,
+    DetectorSchema, trees_dict, defects,
 )
-from utils.files_utils import get_image_bytes
+from utils.inst_segm_model_inf import ObjectDetector
 from utils.s3_util import upload_file
-from settings import S3_PUBLIC_BUCKET, logger
+from settings import logger
 
 
 def get_predict(image_content: bytes, request_id: str) -> PredictSchema:
@@ -19,7 +20,7 @@ def get_predict(image_content: bytes, request_id: str) -> PredictSchema:
     crops = detect.crops
     plants = []
     for crop in crops:
-        plant = get_plant_predict(crop.crop_bytes, crop.id)
+        plant = get_plant_predict(crop.crop_bytes)
         if plant:
             plant.crop_url = crop.url_image
             plants.append(plant)
@@ -38,57 +39,50 @@ def detect_plants(image_content: bytes, request_id) -> DetectorSchema:
     #Todo Пока возвражает захардкоженные кропы, уже загруженные в S3 по request_id
     """
     logger.info("Попытка найти растения")
-    crop_2_bytes = get_image_bytes(
-        f"{S3_PUBLIC_BUCKET}/777a84e2-3523-47fd-8e88-21517f12428d/listvennica_crop.png")
-    crop_22_bytes = get_image_bytes(
-        f"{S3_PUBLIC_BUCKET}/777a84e2-3523-47fd-8e88-21517f12428d/kust_crop.png")
-    framed_img_bytes = get_image_bytes(
-        f"{S3_PUBLIC_BUCKET}/777a84e2-3523-47fd-8e88-21517f12428d/framed_image.jpeg")
-
-    url_crop_2_url = upload_file(
-        file_content=crop_2_bytes,
-        filename="listvennica_crop.png",
-        request_id=request_id,
-    )
-    url_crop_22_url = upload_file(
-        file_content=crop_22_bytes,
-        filename="kust_crop.png",
-        request_id=request_id
-    )
-    framed_img_url = upload_file(
-        file_content=framed_img_bytes,
-        filename="framed_image.jpeg",
-        request_id=request_id
-    )
-    crop_2 = Crop(
-        id=2,
-        crop_bytes=crop_2_bytes,
-        url_image=url_crop_2_url,
-    )
-    crop_22 = Crop(
-        id=22,
-        crop_bytes=crop_22_bytes,
-        url_image=url_crop_22_url,
+    detector = ObjectDetector("./models/best.pt")
+    detector.predict(
+        image_input=image_content,
     )
 
-    plants = DetectorSchema(
-        crops = [crop_2, crop_22],
-        framed_url=framed_img_url,
-    )
-    logger.info(f"Найдено {len(plants.crops)} растения.")
-    return plants
+    objects = detector.get_objects_with_crops()
+    logger.info(f"Найдено {len(objects)} растений.")
+    if objects and len(objects) > 0:
+        annotated_image_bytes = detector.get_annotated_image_bytes()
+        annotated_url = upload_file(
+            file_content=annotated_image_bytes,
+            filename=f"{request_id}_annotated.jpg",
+            request_id=request_id
+            )
+        crops = []
+        for obj in objects:
+            url = upload_file(
+            file_content=obj["img_crop_bytes"],
+            filename=f"object_{obj['id']}_{obj['class_name']}.jpg",
+            request_id=request_id
+            )
+            crop = Crop(
+            id=obj["id"],
+            crop_bytes=obj["img_crop_bytes"],
+            url_image=url,
+            )
+            crops.append(crop)
+        plants = DetectorSchema(
+            crops=crops,
+            framed_url=annotated_url,
+        )
+        return plants
+    else:
+        return DetectorSchema(
+            crops=[],
+            framed_url=None,
+        )
 
-
-def  get_plant_predict(crop_bytes: bytes, plant_id: int) -> Plant | None: #Todo plant_id убрать после готовности мл функций
+def  get_plant_predict(crop_bytes: bytes) -> Plant | None:
     """
     Функция для получения предсказания породы растения на основе кропа растения.
-    ToDo Пока возвращает только 2 захардкоженных растения
+    ToDo Пока возвращает random из коллекции schemas.trees_dict
     """
-    if plant_id == 2:
-        return Plant(id=2, name="Лиственница", latin_name="Larix", plant_type=PlantType.TREE)
-    if plant_id == 22:
-        return Plant(id=22, name="Пузыреплодник калинолистный", latin_name="Physocarpus opulifolius", plant_type=PlantType.SHRUB)
-    return None
+    return random.choice(trees_dict)
 
 
 def get_defects_predict(crop_image: bytes) -> List[Defect] | []:
@@ -98,5 +92,5 @@ def get_defects_predict(crop_image: bytes) -> List[Defect] | []:
     :param crop_image: bytes
     :return: Всегда список. Даже если он пустой
     """
-    defect = Defect(id=17, name="Сухие ветви более 75 %")
-    return [defect]
+    count = random.randint(1, min(5, len(defects)))
+    return random.sample(defects, count)

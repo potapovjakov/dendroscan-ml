@@ -1,6 +1,15 @@
-FROM python:3.12-slim
+FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
 
 LABEL authors="potapovjakov"
+RUN apt-get update && apt-get install -y \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/*
+
 
 WORKDIR /app
 

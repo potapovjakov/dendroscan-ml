@@ -66,7 +66,8 @@ class Plant(BaseModel):
 
 
 class Crop(BaseModel):
-    id: int = Field(..., ge=1, description="Идентификатор кропа в пределах одной фотографии")
+    id: int = Field(..., ge=0, description="Идентификатор кропа в пределах "
+                                           "одной фотографии")
     crop_bytes: bytes
     url_image: str
 
