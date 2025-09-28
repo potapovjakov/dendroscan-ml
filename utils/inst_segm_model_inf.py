@@ -7,6 +7,7 @@ import torch
 from ultralytics import YOLO
 
 from settings import INF_CONF, INF_IOU, logger
+from utils.files_utils import get_image_bytes
 
 
 class ObjectDetector:
@@ -248,31 +249,49 @@ class ObjectDetector:
             logger.error("Ошибка кодирования размеченного изображения")
             return b''
 
+def test_predict():
+    detect = ObjectDetector("../models/best.pt")
+    img_bytes = get_image_bytes("https://dendroscan.s3.cloud.ru/test_image.jpeg")
+    detect.predict(image_input=img_bytes)
+    objects = detect.get_objects_with_crops()
+    assert len(objects) > 1
+    for obj in objects:
+        required_keys = {'id', 'img_crop_bytes', 'class_id', 'class_name', 'bbox'}
+        assert required_keys.issubset(obj.keys()), f"Отсутствуют ключи: {
+        required_keys - set(obj.keys())}"
+        assert type(obj["img_crop_bytes"]) == bytes
+        assert type(obj["class_id"]) == int
+        assert type(obj["class_name"]) == str
+        assert type(obj["bbox"]) == list
 
 # Пример использования
 if __name__ == '__main__':
-    detector = ObjectDetector('../models/best.pt')
+    test_predict()
 
-    # Загрузка из файла
-    detector.predict('start_image.jpeg')
-    logger.info(f"Список ID объектов: {detector.get_object_ids()}")
 
-    # Загрузка из bytes
-    with open('start_image.jpeg', 'rb') as f:
-        image_bytes = f.read()
 
-    detector.predict(image_bytes)
-    objects_with_crops = detector.get_objects_with_crops()
-    logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
-    # Сохранение кропов в файлы
-    for obj in objects_with_crops:
-        with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
-            f.write(obj['img_crop_bytes'])
-        logger.info(f"Сохранен объект {obj['id']}: {obj['class_name']}")
-
-    # Получение размеченного изображения в bytes
-    annotated_image_bytes = detector.get_annotated_image_bytes()
-    with open("annotated_image.jpg", "wb") as f:
-        f.write(annotated_image_bytes)
-
-    detector.show_results()
+    # detector = ObjectDetector('../models/best.pt')
+    #
+    # # Загрузка из файла
+    # detector.predict('test_image.jpeg')
+    # logger.info(f"Список ID объектов: {detector.get_object_ids()}")
+    #
+    # # Загрузка из bytes
+    # with open('test_image.jpeg', 'rb') as f:
+    #     image_bytes = f.read()
+    #
+    # detector.predict(image_bytes)
+    # objects_with_crops = detector.get_objects_with_crops()
+    # logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
+    # # Сохранение кропов в файлы
+    # for obj in objects_with_crops:
+    #     with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
+    #         f.write(obj['img_crop_bytes'])
+    #     logger.info(f"Сохранен объект {obj['id']}: {obj['class_name']}")
+    #
+    # # Получение размеченного изображения в bytes
+    # annotated_image_bytes = detector.get_annotated_image_bytes()
+    # with open("annotated_image.jpg", "wb") as f:
+    #     f.write(annotated_image_bytes)
+    #
+    # detector.show_results()
