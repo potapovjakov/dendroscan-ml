@@ -1,12 +1,12 @@
-from ultralytics import YOLO
-import matplotlib.pyplot as plt
-import cv2
-import numpy as np
-from typing import List, Dict, Any, Union
+from typing import Any, Dict, List, Union
 
-from settings import logger, INF_IOU, INF_CONF
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
-from settings import logger
+from ultralytics import YOLO
+
+from settings import INF_CONF, INF_IOU, logger
 
 
 class ObjectDetector:
