@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List, Union
 
 import cv2
@@ -8,21 +9,42 @@ from ultralytics import YOLO
 
 from settings import INF_CONF, INF_IOU, logger
 from utils.files_utils import get_image_bytes
+from pathlib import Path
 
 
 class ObjectDetector:
-    def __init__(self, weights_path: str):
+    def __init__(self, weights_path: str = None):
         '''
         Класс для детекции и сегментации объектов с помощью YOLO.
         путь до весов модели (.pt файл)
         '''
+        # Проверяем модель
+        model_file_name = "best.pt"
+        default_model_path = os.getenv(f'INF_MODEL_PATH', f'./models/{model_file_name}')
+        weights_path = weights_path if weights_path is not None else (
+            default_model_path)
+        model_path = Path(weights_path)
+        if not model_path.exists():
+            alternative_paths = [
+                f"./models/{model_file_name}",
+                f"../models/{model_file_name}",
+                f"/app/models/{model_file_name}"
+            ]
+            for alt_path in alternative_paths:
+                if Path(alt_path).exists():
+                    weights_path = Path(alt_path)
+                    logger.info(f"Модель найдена по альтернативному пути: {alt_path}")
+                    break
+            else:
+                raise FileNotFoundError(f"Модель не найдена. Проверенные пути: {alternative_paths}")
+
         self.model = YOLO(weights_path)
         self.objects_info = []
 
     def predict(self, image_input: Union[str, bytes], imgsz: int = 640,
                 iou: float = None, conf: float = None,
                 verbose: bool =
-                True):
+                False):
         '''
         Запуск инференса модели на изображении.
 
@@ -250,7 +272,7 @@ class ObjectDetector:
             return b''
 
 def test_predict():
-    detect = ObjectDetector("../models/best.pt")
+    detect = ObjectDetector()
     img_bytes = get_image_bytes("https://dendroscan.s3.cloud.ru/test_image.jpeg")
     detect.predict(image_input=img_bytes)
     objects = detect.get_objects_with_crops()

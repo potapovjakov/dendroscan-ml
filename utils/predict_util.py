@@ -11,7 +11,7 @@ from schemas.schemas import (
 )
 from utils.inst_segm_model_inf import ObjectDetector
 from utils.s3_util import upload_file
-from settings import logger
+from settings import logger, INF_MODEL_PATH
 
 
 def get_predict(image_content: bytes, request_id: str) -> PredictSchema:
@@ -39,7 +39,7 @@ def detect_plants(image_content: bytes, request_id) -> DetectorSchema:
     #Todo Пока возвражает захардкоженные кропы, уже загруженные в S3 по request_id
     """
     logger.info("Попытка найти растения")
-    detector = ObjectDetector("./models/best.pt")
+    detector = ObjectDetector()
     detector.predict(
         image_input=image_content,
     )
