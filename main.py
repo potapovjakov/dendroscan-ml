@@ -68,7 +68,7 @@ async def start(
         img_bytes = get_image_bytes(public_url)
         predict = get_predict(img_bytes, request_id)
         response = ScanResponse(
-            scan_id=scan_id,
+            id=scan_id,
             predict=predict,
         )
         return response
