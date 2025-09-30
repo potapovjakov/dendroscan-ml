@@ -7,8 +7,6 @@ services:
     ports:
       - "8080:8000"
     restart: unless-stopped
-    depends_on:
-      - backend
     volumes:
       - ./models:/app/models
     healthcheck:
