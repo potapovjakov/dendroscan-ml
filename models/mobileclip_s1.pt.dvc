@@ -1,0 +1,5 @@
+outs:
+- md5: 62b47279c05c3e2b11898fc7197565f8
+  size: 340784294
+  hash: md5
+  path: mobileclip_s1.pt
