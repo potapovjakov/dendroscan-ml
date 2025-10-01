@@ -5,6 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from fastapi import HTTPException
 from ultralytics import YOLO
 
 from settings import INF_CONF, INF_IOU, logger
@@ -73,6 +74,7 @@ class ObjectDetector:
             nparr = np.frombuffer(image_input, np.uint8)
             self.image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if self.image is None:
+                raise HTTPException(400, "Не удалось декодировать изображение из bytes")
                 logger.error("Не удалось декодировать изображение из bytes")
                 return None
         else:

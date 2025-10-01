@@ -1,13 +1,16 @@
+import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Annotated
 from urllib.parse import urlparse
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, UploadFile, \
+    Form
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas.schemas import HealthResponse, ScanResponse, MLRequest
-from settings import ML_TOKEN, logger, S3_PUBLIC_BUCKET
-from utils.files_utils import get_image_bytes
+from schemas.schemas import HealthResponse, ScanResponse, APIRequestSchema, \
+    ScanRequestSchema
+from settings import ML_TOKEN, logger, S3_PUBLIC_BUCKET, S3_BUCKET_NAME
+from utils.files_utils import get_image_bytes, check_file
 from utils.predict_util import get_predict
 app = FastAPI()
 
@@ -42,39 +45,37 @@ def verify_ml_token(ml_token: Optional[str] = Header(None)):
         raise HTTPException(status_code=403, detail="Invalid or missing ML token")
     return True
 
-@app.post("/scan", response_model=ScanResponse)
-async def start(
-    request_data: MLRequest = Body(...),
-    token_verified: bool = Depends(verify_ml_token)
+
+async def validate_file_or_url(
+    file: Annotated[UploadFile, Depends(check_file)],
+    url: Optional[str] = Form(None),
 ):
-    request_id = request_data.request_id
-    user_id = request_data.user_id
+    if file is None and url is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Either 'file' or 'url' must be provided"
+        )
+    return {"file": file, "url": url}
+
+@app.post("/scan", response_model=ScanResponse)
+async def scan(
+    file: Annotated[UploadFile, Depends(check_file)],
+    request_id: str = Form(...),
+    user_id: str = Form(...),
+    token_verified: bool = Depends(verify_ml_token),
+):
     logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
                 f"{user_id}")
-    url = request_data.url
-    # ml_request_id = uuid.uuid4() ToDo так же харкодим временно
-    scan_id = "666a84e2-3523-47fd-8e88-21517f12428d"
-    logger.info(f"Начат процесс сканирования: {scan_id} по URL: {url}")
+    scan_id = str(uuid.uuid4())
+    logger.info(f"Начат процесс сканирования: {scan_id}")
     try:
-        if not url.startswith("http"):
-            raise HTTPException(status_code=400, detail="Invalid S3 URL format")
-        parsed_url = urlparse(url)
-        path_parts = parsed_url.path.lstrip('/').split('/')
-        if len(path_parts) < 2:
-            raise HTTPException(status_code=400, detail="Invalid S3 URL format")
-        public_url = f"{S3_PUBLIC_BUCKET}/{path_parts[1]}/{path_parts[2]}"
-        logger.info(f"Сконвертирован публичный урл {public_url}")
-        img_bytes = get_image_bytes(public_url)
-        logger.info(f"Файл скачан {public_url}, начинаю предсказание")
-        predict = get_predict(img_bytes, request_id)
+        image_bytes = await file.read()
+        predict = await get_predict(image_bytes, request_id)
         response = ScanResponse(
             id=scan_id,
             predict=predict,
         )
         return response
 
-
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error {str(e)}")

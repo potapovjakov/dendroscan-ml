@@ -27,6 +27,7 @@ S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 S3_PUBLIC_BUCKET = os.getenv("S3_PUBLIC_BUCKET")
 ML_TOKEN = os.getenv("ML_TOKEN")
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 # Параметры ML инференса:
 INF_MODEL_PATH = os.getenv("INF_MODEL_PATH", "../models/best.pt")
