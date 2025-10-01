@@ -1,3 +1,5 @@
+import logging
+
 import requests
 
 def get_image_bytes(url):
@@ -6,10 +8,11 @@ def get_image_bytes(url):
     :param url:
     :return:
     """
-    #Todo доработать, добавить исключения
     try:
+        logging.info(f"Пытаюсь загрузить файл по урл: {url}")
         response = requests.get(url)
         response.raise_for_status()
+        logging.info(f"Получил ответ {response}")
         image_bytes = response.content
         return image_bytes
 

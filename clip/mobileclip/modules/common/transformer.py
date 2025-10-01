@@ -17,7 +17,7 @@ from torch import Size, Tensor, nn
 from torch.nn import functional as F
 from torchvision.ops import StochasticDepth
 
-from mobileclip import logger
+from clip.mobileclip import logger
 
 
 class LayerNormFP32(nn.LayerNorm):

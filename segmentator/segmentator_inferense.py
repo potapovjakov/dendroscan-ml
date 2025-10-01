@@ -8,7 +8,6 @@ import torch
 from ultralytics import YOLO
 
 from settings import INF_CONF, INF_IOU, logger
-from utils.files_utils import get_image_bytes
 from pathlib import Path
 
 
@@ -42,7 +41,7 @@ class ObjectDetector:
         self.objects_info = []
 
     def predict(self, image_input: Union[str, bytes], imgsz: int = 640,
-                iou: float = None, conf: float = None,
+                iou: float = 0.5, conf: float = 0.3,
                 verbose: bool =
                 False):
         '''

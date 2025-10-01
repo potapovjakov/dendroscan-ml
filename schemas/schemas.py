@@ -47,7 +47,6 @@ class PlantType(str, Enum):
 
 class Defect(BaseModel):
     """Дефект растения"""
-    id: int = Field(..., ge=1, description="Уникальный идентификатор дефекта")
     name: str = Field(max_length=256)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Уверенность распознавания дефекта")
 
@@ -55,7 +54,6 @@ class Defect(BaseModel):
 class Plant(BaseModel):
     """Схема растения"""
     id: int = Field(..., ge=1, description="Уникальный идентификатор растения")
-    plant_type: PlantType = Field(..., description="Тип растения")
     name: str = Field(..., min_length=1, description="Название растения")
     latin_name: Optional[str] = Field(None, description="Латинское название растения")
     confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Уверенность распознавания растения")

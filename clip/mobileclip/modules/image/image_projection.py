@@ -1,14 +1,10 @@
-#
-# For licensing see accompanying LICENSE file.
-# Copyright (C) 2024 Apple Inc. All Rights Reserved.
-#
 from typing import List, Optional
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 
-from mobileclip import logger
+from clip.mobileclip import logger
 
 
 class GlobalPool(nn.Module):

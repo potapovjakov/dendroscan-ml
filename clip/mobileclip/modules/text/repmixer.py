@@ -1,14 +1,10 @@
-#
-# For licensing see accompanying LICENSE file.
-# Copyright (C) 2024 Apple Inc. All Rights Reserved.
-#
 from typing import Optional
 
 import torch
 import torch.nn as nn
 
 from timm.models.layers import DropPath, trunc_normal_
-from mobileclip.modules.common.mobileone import MobileOneBlock
+from clip.mobileclip.modules.common.mobileone import MobileOneBlock
 
 
 class ConvFFN(nn.Module):

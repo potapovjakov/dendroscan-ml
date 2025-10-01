@@ -65,19 +65,15 @@ def upload_file(file_content: bytes, filename: str, request_id: uuid.UUID) -> st
     Raises:
         HTTPException: Если произошла ошибка при загрузке
     """
-
     s3_key = f"{request_id}/{filename}"
-
     try:
         s3.put_object(
             Bucket=S3_BUCKET_NAME,
             Key=s3_key,
             Body=file_content,
         )
-
         file_url = f"{S3_PUBLIC_BUCKET}/{s3_key}"
-
-        logger.info(f"Файл {filename} успешно загружен в S3 как {s3_key}")
+        logger.info(f"Файл успешно загружен в S3 как {file_url}")
         return file_url
 
     except ClientError as e:

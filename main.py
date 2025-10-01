@@ -49,7 +49,6 @@ async def start(
 ):
     request_id = request_data.request_id
     user_id = request_data.user_id
-
     logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
                 f"{user_id}")
     url = request_data.url
@@ -63,9 +62,10 @@ async def start(
         path_parts = parsed_url.path.lstrip('/').split('/')
         if len(path_parts) < 2:
             raise HTTPException(status_code=400, detail="Invalid S3 URL format")
-        logger.info(path_parts)
         public_url = f"{S3_PUBLIC_BUCKET}/{path_parts[1]}/{path_parts[2]}"
+        logger.info(f"Сконвертирован публичный урл {public_url}")
         img_bytes = get_image_bytes(public_url)
+        logger.info(f"Файл скачан {public_url}, начинаю предсказание")
         predict = get_predict(img_bytes, request_id)
         response = ScanResponse(
             id=scan_id,

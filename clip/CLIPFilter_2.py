@@ -1,6 +1,6 @@
 import torch
 from PIL import Image
-import mobileclip
+from  clip.mobileclip import create_model_and_transforms, get_tokenizer
 
 class CLIPFilter:
     def __init__(self, model_path: str, filters: dict, translations: dict, latin_names: dict, device=None):
@@ -12,11 +12,11 @@ class CLIPFilter:
         """
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.model, _, self.preprocess = mobileclip.create_model_and_transforms(
+        self.model, _, self.preprocess = create_model_and_transforms(
             'mobileclip_s1', pretrained=model_path
         )
         self.model = self.model.to(self.device).eval()
-        self.tokenizer = mobileclip.get_tokenizer('mobileclip_s1')
+        self.tokenizer = get_tokenizer('mobileclip_s1')
 
         self.filters = filters
         self.translations = translations
@@ -44,7 +44,7 @@ class CLIPFilter:
             ]
         }
         """
-        results = {}
+        result = {}
         with torch.no_grad():
             img_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
             image_features = self.model.encode_image(img_tensor)
@@ -61,7 +61,7 @@ class CLIPFilter:
             latin_name = self.latin_names.get(label_en, "")
             confidence = probs[best_idx].item()
 
-            results["plants"] = {
+            result["plant"] = {
                 "name": label_ru,
                 "latin_name": latin_name,
                 "confidence": round(confidence, 3)
@@ -92,6 +92,6 @@ class CLIPFilter:
                     "confidence": round(probs[best_idx].item(), 3)
                 })
 
-            results["defects"] = problem_list
+            result["plant"]["defects"] = problem_list
 
-        return results
+        return result

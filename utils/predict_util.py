@@ -1,31 +1,30 @@
-import random
-from typing import List
+import time
 
+from fastapi import HTTPException
+
+from clip.clip_inferense import get_clip_predict
 from schemas.schemas import (
     Plant,
-    PlantType,
-    Defect,
     Crop,
     PredictSchema,
-    DetectorSchema, trees_dict, defects,
+    DetectorSchema,
 )
-from utils.inst_segm_model_inf import ObjectDetector
+from segmentator.segmentator_inferense import ObjectDetector
 from utils.s3_util import upload_file
-from settings import logger, INF_MODEL_PATH
+from settings import logger
 
 
 def get_predict(image_content: bytes, request_id: str) -> PredictSchema:
     """Главная ML функция."""
     detect = detect_plants(image_content, request_id=request_id)
     crops = detect.crops
+    logger.info(f"Нашел {len(crops)} растений, отправляю на определение.")
     plants = []
     for crop in crops:
         plant = get_plant_predict(crop.crop_bytes)
         if plant:
             plant.crop_url = crop.url_image
             plants.append(plant)
-            defect = get_defects_predict(crop.crop_bytes)
-            plant.defects = defect
     predict_response = PredictSchema(
         plants=plants,
         framed_url=detect.framed_url,
@@ -36,7 +35,6 @@ def detect_plants(image_content: bytes, request_id) -> DetectorSchema:
     """
     Функция должна принять исходное фото и вернуть список с кропами, id всех
     найденных растений и фото с рамками найденных растений.
-    #Todo Пока возвражает захардкоженные кропы, уже загруженные в S3 по request_id
     """
     logger.info("Попытка найти растения")
     detector = ObjectDetector()
@@ -82,15 +80,24 @@ def  get_plant_predict(crop_bytes: bytes) -> Plant | None:
     Функция для получения предсказания породы растения на основе кропа растения.
     ToDo Пока возвращает random из коллекции schemas.trees_dict
     """
-    return random.choice(trees_dict)
-
-
-def get_defects_predict(crop_image: bytes) -> List[Defect] | []:
-    """
-    Функция поиска дефектов на кропе. ToDo пока возвращает хардкод
-
-    :param crop_image: bytes
-    :return: Всегда список. Даже если он пустой
-    """
-    count = random.randint(1, min(5, len(defects)))
-    return random.sample(defects, count)
+    logger.info(f"Начинаю классифицировать растение и его дефекты")
+    start_time = time.time()
+    try:
+        result = get_clip_predict(crop_bytes)
+        result_time = time.time() - start_time
+        if len(result["plant"]) > 0:
+            logger.info(
+                f"Определил растение как: {result["plant"]} за {result_time:.3f} сек."
+            )
+            plant = Plant(
+                id=1,
+                name=result["plant"]["name"],
+                latin_name=result["plant"]["latin_name"],
+                confidence=result["plant"]["confidence"],
+                defects=result["plant"]["defects"],
+                processing_time=float(f"{result_time:.3f}"),
+            )
+            return plant
+        return None
+    except Exception as e:
+        raise HTTPException(500, e)

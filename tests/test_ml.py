@@ -1,5 +1,5 @@
 from utils.files_utils import get_image_bytes
-from utils.inst_segm_model_inf import ObjectDetector
+from segmentator.segmentator_inferense import ObjectDetector
 
 def test_predict():
     detect = ObjectDetector()
