@@ -46,24 +46,14 @@ def verify_ml_token(ml_token: Optional[str] = Header(None)):
     return True
 
 
-async def validate_file_or_url(
-    file: Annotated[UploadFile, Depends(check_file)],
-    url: Optional[str] = Form(None),
-):
-    if file is None and url is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Either 'file' or 'url' must be provided"
-        )
-    return {"file": file, "url": url}
-
 @app.post("/scan", response_model=ScanResponse)
 async def scan(
-    file: Annotated[UploadFile, Depends(check_file)],
+    file: UploadFile,
     request_id: str = Form(...),
     user_id: str = Form(...),
     token_verified: bool = Depends(verify_ml_token),
 ):
+
     logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
                 f"{user_id}")
     scan_id = str(uuid.uuid4())
@@ -75,6 +65,7 @@ async def scan(
             id=scan_id,
             predict=predict,
         )
+        logger.info(response)
         return response
 
     except Exception as e:
