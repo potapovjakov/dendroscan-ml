@@ -65,7 +65,7 @@ async def scan(
             id=scan_id,
             predict=predict,
         )
-        logger.info(response)
+        logger.warning(f"ML RESPONSE: {response}")
         return response
 
     except Exception as e:

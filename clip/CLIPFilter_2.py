@@ -1,26 +1,20 @@
 import torch
 from PIL import Image
+
+import clip
 from  clip.mobileclip import create_model_and_transforms, get_tokenizer
 
 class CLIPFilter:
-    def __init__(self, model_path: str, filters: dict, translations: dict, latin_names: dict, device=None):
-        """
-        model_path: путь до модели (например, "mobileclip_s1.pt")
-        filters: словарь с классами {"plants": [...], "defects": [...]}
-        translations: словарь переводов EN -> RU
-        latin_names: словарь с латинскими названиями растений
-        """
+    def __init__(self, model_path: str, filters: dict, device=None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.model, _, self.preprocess = create_model_and_transforms(
+        self.model, _, self.preprocess = clip.mobileclip.create_model_and_transforms(
             'mobileclip_s1', pretrained=model_path
         )
         self.model = self.model.to(self.device).eval()
-        self.tokenizer = get_tokenizer('mobileclip_s1')
+        self.tokenizer = clip.mobileclip.get_tokenizer('mobile/mobileclip_s1')
 
         self.filters = filters
-        self.translations = translations
-        self.latin_names = latin_names
         self.prompt_embeds = {}
 
         with torch.no_grad():
@@ -33,65 +27,66 @@ class CLIPFilter:
                     "embeds": text_features
                 }
 
-    def process(self, image: Image.Image, threshold: float = 0.2):
-        """
-        Обрабатывает изображение и возвращает результат:
-        {
-            "plants": { "name", "latin_name", "confidence" },
-            "defects": [
-                { "name", "confidence" },
-                ...
-            ]
-        }
-        """
-        result = {}
+    def process(self, image: Image.Image, problem_threshold=0.2):
         with torch.no_grad():
             img_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
             image_features = self.model.encode_image(img_tensor)
             image_features /= image_features.norm(dim=-1, keepdim=True)
 
-            # ----- plants (один лучший вариант)
-            data = self.prompt_embeds["plants"]
-            text_features = data["embeds"]
-            probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)[0]
+            raw_results = {}
+            problem_probs = {}
 
-            best_idx = probs.argmax().item()
-            label_en = data["labels"][best_idx]
-            label_ru = self.translations.get(label_en, label_en)
-            latin_name = self.latin_names.get(label_en, "")
-            confidence = probs[best_idx].item()
+            for key, data in self.prompt_embeds.items():
+                text_features = data["embeds"]
+                probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)[0]
 
-            result["plant"] = {
-                "name": label_ru,
-                "latin_name": latin_name,
-                "confidence": round(confidence, 3)
-            }
+                if "problems" in key:
+                    # сохраняем вероятности для всех проблемных классов
+                    problem_probs[key] = {
+                        data["labels"][i].replace("A photo of ", ""): float(probs[i])
+                        for i in range(len(probs))
+                    }
+                else:
 
-            # ----- defects (несколько по threshold)
-            data = self.prompt_embeds["defects"]
-            text_features = data["embeds"]
-            probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)[0]
+                    best_idx = probs.argmax().item()
+                    label = data["labels"][best_idx].replace("A photo of ", "")
+                    confidence = float(probs[best_idx])
+                    raw_results[key] = {"label": label, "confidence": confidence}
 
-            problem_list = []
-            for i, p in enumerate(probs):
-                if p.item() >= threshold:
-                    label_en = data["labels"][i]
-                    label_ru = self.translations.get(label_en, label_en)
-                    problem_list.append({
-                        "name": label_ru,
-                        "confidence": round(p.item(), 3)
-                    })
+            final_results = {}
+            main_type = raw_results.get("tree or bush", {}).get("label", "").lower()
+            if "tree" in main_type:
+                final_results["type"] = "tree"
+            elif "bush" in main_type:
+                final_results["type"] = "bush"
 
-            # если ни один не прошёл threshold — берём максимум
-            if not problem_list:
-                best_idx = probs.argmax().item()
-                label_en = data["labels"][best_idx]
-                label_ru = self.translations.get(label_en, label_en)
-                problem_list.append({
-                    "name": label_ru,
-                    "confidence": round(probs[best_idx].item(), 3)
-                })
 
-            result["plant"]["defects"] = problem_list
+            for key, value in raw_results.items():
+                if key == "tree or bush":
+                    continue
+                if (final_results.get("type") == "tree" and "tree" in key) or \
+                        (final_results.get("type") == "bush" and "bush" in key):
+                    final_results[key] = value
 
-        return result
+
+            for key, probs_dict in problem_probs.items():
+                if (final_results.get("type") == "tree" and "tree" in key) or \
+                        (final_results.get("type") == "bush" and "bush" in key):
+                    selected = [
+                        k for k, v in probs_dict.items()
+                        if v >= problem_threshold and "normal tree" not in k.lower() and "normal bush" not in k.lower()
+                    ]
+                    if not selected:
+                        final_results[key] = None
+                    elif len(selected) == 1:
+                        final_results[key] = {
+                            "label": selected[0],
+                            "confidence": probs_dict[selected[0]]
+                        }
+                    else:
+                        final_results[key] = [
+                            {"label": s, "confidence": probs_dict[s]}
+                            for s in selected
+                        ]
+
+            return final_results

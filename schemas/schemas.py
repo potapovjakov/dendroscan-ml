@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import cv2
 import numpy as np
@@ -57,28 +57,41 @@ class PredictSchema(BaseModel):
     plants: List["Plant"]
     framed_url: Optional[str] = Field(description="Исходное фото с рамками")
 
-
-class PlantType(str, Enum):
-    """Тип растения"""
-    SHRUB = "Кустарник"
-    TREE = "Дерево"
-
-
-class Defect(BaseModel):
+class DefectSchema(BaseModel):
     """Дефект растения"""
     name: str = Field(max_length=256)
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Уверенность распознавания дефекта")
+    confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Уверенность распознавания дефекта",
+    )
 
 
 class Plant(BaseModel):
     """Схема растения"""
     id: int = Field(..., ge=1, description="Уникальный идентификатор растения")
     name: str = Field(..., min_length=1, description="Название растения")
-    latin_name: Optional[str] = Field(None, description="Латинское название растения")
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Уверенность распознавания растения")
-    defects: List[Defect] = Field(default_factory=list, description="Список дефектов растения")
+    latin_name: Optional[str] = Field(
+        None,
+        description="Латинское название растения",
+    )
+    type: str
+    confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Уверенность распознавания растения",
+    )
+    defects: List["DefectSchema"] = Field(
+        default_factory=list,
+        description="Список дефектов растения",
+    )
     processing_time: float = Field(default=0.0, description="Время обработки")
-    crop_url: str = Optional
+    crop_url: Optional[str] = Field(
+        default=None,
+        description="URL изображения. Может быть null"
+    )
 
 
 
@@ -87,7 +100,18 @@ class Crop(BaseModel):
                                            "одной фотографии")
     crop_bytes: bytes
     url_image: str
-#
+
+class ClipReturnSchema(BaseModel):
+    plant: "ClipPlantSchema"
+
+class ClipPlantSchema(BaseModel):
+    name: str
+    latin_name: str
+    confidence: float
+    type: str
+    defects: List = []
+
+
 # trees_dict: List[Plant] = [
 #     Plant(id=1, name="Клен остролистный", latin_name="Acer platanoides", plant_type=PlantType.TREE),
 #     Plant(id=2, name="Лиственница", latin_name="Larix", plant_type=PlantType.TREE),

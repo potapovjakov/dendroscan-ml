@@ -84,16 +84,19 @@ async def  get_plant_predict(crop_bytes: bytes) -> Plant | None:
     start_time = time.time()
     try:
         result = get_clip_predict(crop_bytes)
+        logger.info(f"result get plant predict: {result}")
         result_time = time.time() - start_time
-        if len(result["plant"]) > 0:
+        if len(result["plant"]) >= 0:
             logger.info(
-                f"Определил растение как: {result["plant"]} за {result_time:.3f} сек."
+                f"Определил растение как: {result['plant']['name']} за {result_time:.3f} сек."
             )
+            logger.info(result)
             plant = Plant(
                 id=1,
                 name=result["plant"]["name"],
                 latin_name=result["plant"]["latin_name"],
                 confidence=result["plant"]["confidence"],
+                type=result["plant"]["type"],
                 defects=result["plant"]["defects"],
                 processing_time=float(f"{result_time:.3f}"),
             )
