@@ -37,12 +37,13 @@ class ObjectDetector:
                     break
             else:
                 raise FileNotFoundError(f"Модель не найдена. Проверенные пути: {alternative_paths}")
-
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model = YOLO(weights_path)
+        self.model.to(self.device)
         self.objects_info = []
 
     def predict(self, image_input: Union[str, bytes], imgsz: int = 640,
-                iou: float = 0.5, conf: float = 0.3,
+                iou: float = 0.65, conf: float = 0.2,
                 verbose: bool =
                 False):
         '''
@@ -84,7 +85,7 @@ class ObjectDetector:
         # Сохраняем оригинальные bytes для возможного повторного использования
         self.original_input = image_input
 
-        results = self.model(self.image, imgsz=imgsz, iou=iou, conf=conf, verbose=verbose)
+        results = self.model(self.image, imgsz=imgsz, iou=iou, conf=conf, verbose=verbose, device=self.device )
         self.res = results[0]
 
         if self.res.boxes is None or len(self.res.boxes) == 0:
