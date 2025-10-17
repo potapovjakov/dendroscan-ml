@@ -17,32 +17,9 @@ services:
       start_period: 40s
     networks:
       - app-network
-  minio:
-    image: nexus.kadastr.ru:5000/minio/minio:RELEASE.2024-06-11T03-13-30Z.fips
-    container_name: minio
-    command: server /data --console-address ":9001"
-    env_file:
-      - .env
-    environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin123}
-      MINIO_DEFAULT_BUCKETS: "bucket-cc8410"
-    ports:
-      - "9000:9000"  # API порт
-      - "9001:9001"  # Web Console порт
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    networks:
-      - app-network
+
+
 
 networks:
   app-network:
     driver: bridge
-
-volumes:
-  minio_data:
