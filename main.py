@@ -1,16 +1,12 @@
 import uuid
 from datetime import datetime
-from typing import Optional, Annotated
-from urllib.parse import urlparse
+from typing import Optional
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, UploadFile, \
-    Form
+from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 
-from schemas.schemas import HealthResponse, ScanResponse, APIRequestSchema, \
-    ScanRequestSchema
-from settings import ML_TOKEN, logger, S3_PUBLIC_BUCKET, S3_BUCKET_NAME
-from utils.files_utils import get_image_bytes, check_file
+from schemas.schemas import HealthResponse, ScanResponse
+from settings import ML_TOKEN, logger
 from utils.predict_util import get_predict
 app = FastAPI()
 
