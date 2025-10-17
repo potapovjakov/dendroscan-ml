@@ -1,5 +1,7 @@
 services:
   ml-service:
+    # Если необходимо запустить сервис из готового образа, то нужно
+    # закомментировать build и раскомментировать image
     build: .
     #image: potapovjakov/dendroscan-ml:dev-torch
     env_file:
