@@ -208,6 +208,7 @@ def normalize_result(res: dict) -> dict:
     normalized = {}
     plant = res.get("tree species") or res.get("bush species") or {}
 
+    # Инициализируем plant как словарь
     normalized["plant"] = {
         "name": plant.get("name", "") if isinstance(plant, dict) else "",
         "latin_name": plant.get("latin_name", "") if isinstance(plant, dict) else "",
@@ -215,11 +216,15 @@ def normalize_result(res: dict) -> dict:
         if isinstance(plant, dict)
         else 0.0,
     }
+
+    # Добавляем тип растения
     plant_type = res.get("type")
     if plant_type == "tree":
-        normalized["plant"]["type"] ="Дерево"
+        normalized["plant"]["type"] = "Дерево"
     elif plant_type == "bush":
-        normalized["plant"]["type"] ="Куст"
+        normalized["plant"]["type"] = "Куст"
+    else:
+        normalized["plant"]["type"] = ""
 
     defects = []
     for key in [
@@ -229,36 +234,53 @@ def normalize_result(res: dict) -> dict:
         "tree is leaning",
     ]:
         val = res.get(key)
-        logger.info(val)
-        if not val or val["name"] == "здоровый куст" or val["name"] == "прямое дерево":
+        logger.info(f"Processing {key}: {val}")
+
+        if not val:
+            continue
+
+        # Проверяем на здоровые состояния
+        if isinstance(val, dict) and val.get("name") in ["здоровый куст", "прямое дерево"]:
+            continue
+        if isinstance(val, str) and val in ["здоровый куст", "прямое дерево"]:
             continue
 
         if isinstance(val, list):
             for v in val:
                 if isinstance(v, dict):
-                    defects.append(
-                        {
-                            "name": v.get("name")
-                            or v.get("problem")
-                            or v.get("label", ""),
-                            "confidence": float(v.get("confidence", 0.0)),
-                        }
-                    )
+                    # Получаем имя из возможных полей
+                    name = v.get("name") or v.get("problem") or v.get("label", "")
+                    # Пропускаем здоровые состояния
+                    if name in ["здоровый куст", "прямое дерево"]:
+                        continue
+                    defects.append({
+                        "name": name,
+                        "confidence": float(v.get("confidence", 0.0)),
+                    })
                 else:
+                    # Пропускаем здоровые состояния для строк
+                    if str(v) in ["здоровый куст", "прямое дерево"]:
+                        continue
                     defects.append({"name": str(v), "confidence": 0.0})
+
         elif isinstance(val, dict):
-            defects.append(
-                {
-                    "name": val.get("name")
-                    or val.get("problem")
-                    or val.get("label", ""),
-                    "confidence": float(val.get("confidence", 0.0)),
-                }
-            )
+            name = val.get("name") or val.get("problem") or val.get("label", "")
+            # Пропускаем здоровые состояния
+            if name in ["здоровый куст", "прямое дерево"]:
+                continue
+            defects.append({
+                "name": name,
+                "confidence": float(val.get("confidence", 0.0)),
+            })
+
         else:
+            # Пропускаем здоровые состояния для строк
+            if str(val) in ["здоровый куст", "прямое дерево"]:
+                continue
             defects.append({"name": str(val), "confidence": 0.0})
+
     normalized["plant"]["defects"] = defects
-    logger.info(f"normalized result: {normalized.items()}")
+    logger.info(f"normalized result: {normalized}")
 
     return normalized
 
