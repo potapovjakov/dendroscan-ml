@@ -17,7 +17,13 @@ services:
       start_period: 40s
     networks:
       - app-network
-
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
 
 
 networks:
