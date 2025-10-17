@@ -43,7 +43,7 @@ class ObjectDetector:
         self.objects_info = []
 
     def predict(self, image_input: Union[str, bytes], imgsz: int = 640,
-                iou: float = 0.65, conf: float = 0.27,
+                iou: float = 0.65, conf: float = 0.2,
                 verbose: bool =
                 False):
         '''
