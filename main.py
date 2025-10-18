@@ -46,12 +46,10 @@ def verify_ml_token(ml_token: Optional[str] = Header(None)):
 async def scan(
     file: UploadFile,
     request_id: str = Form(...),
-    user_id: str = Form(...),
     token_verified: bool = Depends(verify_ml_token),
 ):
 
-    logger.info(f"Получен новый запрос от API: {request_id}, ID пользователя: "
-                f"{user_id}")
+    logger.info(f"Получен новый запрос от API: {request_id}")
     scan_id = str(uuid.uuid4())
     logger.info(f"Начат процесс сканирования: {scan_id}")
     try:
