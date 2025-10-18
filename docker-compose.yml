@@ -1,5 +1,6 @@
 services:
   base-ml-service:
+    container_name: dendroscan-ml
     build: .
     env_file:
       - .env
