@@ -140,9 +140,15 @@ def clean_key(s: str) -> str:
     return s
 
 
-def process_image(image_path: str, model, preprocess, tokenizer, translation_dict: dict, problem_translation_dict: dict,
-                  defect_threshold: float = 0.2) -> dict:
-    img = Image.open(image_path).convert("RGB")
+def process_image(
+        img: bytes,
+        model,
+        preprocess,
+        tokenizer,
+        translation_dict:dict,
+        problem_translation_dict: dict,
+        defect_threshold: float = 0.2,
+) -> dict:
     image_input = preprocess(img).unsqueeze(0)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
