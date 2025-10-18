@@ -1,10 +1,9 @@
 import io
 from settings import logger
 from PIL import Image
-from clip.CLIPFilter_2 import CLIPFilter
 from clip.mobileclip.translate import translation_dict
 from settings import logger
-import mobileclip
+from clip import mobileclip
 import torch
 filters = {
     "tree species": [
@@ -222,11 +221,11 @@ def normalize_result(res: dict) -> dict:
     normalized = {}
     plant = res.get("tree species") or res.get("bush species") or {}
 
-    # Инициализируем plant как словарьA
+    # Инициализируем plant
     normalized["plant"] = {
-        "name": plant.get("name", "") if isinstance(plant, dict) else "",
-        "latin_name": plant.get("latin_name", "") if isinstance(plant, dict) else "",
-        "confidence": float(plant.get("confidence", 0.0))
+        "name": str(plant.get("name") or "") if isinstance(plant, dict) else "",
+        "latin_name": str(plant.get("latin_name") or "") if isinstance(plant, dict) else "",
+        "confidence": float(plant.get("confidence") or 0.0)
         if isinstance(plant, dict)
         else 0.0,
     }
@@ -241,6 +240,8 @@ def normalize_result(res: dict) -> dict:
         normalized["plant"]["type"] = ""
 
     defects = []
+    healthy_states = ["здоровый куст", "прямое дерево"]
+
     for key in [
         "tree problems",
         "bush problems",
@@ -248,54 +249,45 @@ def normalize_result(res: dict) -> dict:
         "tree is leaning",
     ]:
         val = res.get(key)
-        logger.info(f"Processing {key}: {val}")
+        logger.info(f"Processing key '{key}': {val}")
 
         if not val:
             continue
 
-        # Проверяем на здоровые состояния
-        if isinstance(val, dict) and val.get("name") in ["здоровый куст", "прямое дерево"]:
-            continue
-        if isinstance(val, str) and val in ["здоровый куст", "прямое дерево"]:
-            continue
+        if isinstance(val, dict):
+            name = str(val.get("name") or val.get("problem") or val.get("label") or "")
+            if name not in healthy_states:
+                confidence = float(val.get("confidence") or 0.0)
+                defects.append({"name": name, "confidence": confidence})
+                if name == "":
+                    logger.warning(f"Defect in '{key}' has empty name: {val}")
 
-        if isinstance(val, list):
+        elif isinstance(val, list):
             for v in val:
                 if isinstance(v, dict):
-                    # Получаем имя из возможных полей
-                    name = v.get("name") or v.get("problem") or v.get("label", "")
-                    # Пропускаем здоровые состояния
-                    if name in ["здоровый куст", "прямое дерево"]:
-                        continue
-                    defects.append({
-                        "name": name,
-                        "confidence": float(v.get("confidence", 0.0)),
-                    })
+                    name = str(v.get("name") or v.get("problem") or v.get("label") or "")
+                    confidence = float(v.get("confidence") or 0.0)
+                    if name not in healthy_states:
+                        defects.append({"name": name, "confidence": confidence})
+                        if name == "":
+                            logger.warning(f"Defect in '{key}' list has empty name: {v}")
                 else:
-                    # Пропускаем здоровые состояния для строк
-                    if str(v) in ["здоровый куст", "прямое дерево"]:
-                        continue
-                    defects.append({"name": str(v), "confidence": 0.0})
-
-        elif isinstance(val, dict):
-            name = val.get("name") or val.get("problem") or val.get("label", "")
-            # Пропускаем здоровые состояния
-            if name in ["здоровый куст", "прямое дерево"]:
-                continue
-            defects.append({
-                "name": name,
-                "confidence": float(val.get("confidence", 0.0)),
-            })
+                    name = str(v or "")
+                    if name not in healthy_states:
+                        defects.append({"name": name, "confidence": 0.0})
+                        if name == "":
+                            logger.warning(f"Defect in '{key}' list has empty name: {v}")
 
         else:
-            # Пропускаем здоровые состояния для строк
-            if str(val) in ["здоровый куст", "прямое дерево"]:
-                continue
-            defects.append({"name": str(val), "confidence": 0.0})
+            name = str(val or "")
+            if name not in healthy_states:
+                defects.append({"name": name, "confidence": 0.0})
+                if name == "":
+                    logger.warning(f"Defect in '{key}' has empty name: {val}")
 
-    normalized["plant"]["defects"] = defects
-    logger.info(f"normalized result: {normalized}")
+    normalized["plant"]["defects"] = defects or []
 
+    logger.info(f"Normalized result: {normalized}")
     return normalized
 
 
@@ -303,7 +295,7 @@ def get_clip_predict(crop_bytes):
     model, _, preprocess = mobileclip.create_model_and_transforms('mobileclip_s1', pretrained=None)
     tokenizer = mobileclip.get_tokenizer('mobileclip_s1')
 
-    state_dict = torch.load("models/mobileclip_s1_finetuned.pt", map_location='cpu')
+    state_dict = torch.load(r"C:\Users\user\PycharmProjects\dendroscan-ml\models\mobileclip_s1_finetuned.pt", map_location='cpu')
     model.load_state_dict(state_dict, strict=False)
     model.eval()
 
@@ -314,5 +306,10 @@ def get_clip_predict(crop_bytes):
     return norm_result
 
 
+with open(r"C:\Users\user\PycharmProjects\dendroscan-ml\test_image.jpg", "rb") as f:
+    img_bytes = f.read()
 
+# Прогоняем через модель
+result = get_clip_predict(img_bytes)
 
+print(result)
