@@ -295,7 +295,7 @@ def get_clip_predict(crop_bytes):
     model, _, preprocess = mobileclip.create_model_and_transforms('mobileclip_s1', pretrained=None)
     tokenizer = mobileclip.get_tokenizer('mobileclip_s1')
 
-    state_dict = torch.load(r"C:\Users\user\PycharmProjects\dendroscan-ml\models\mobileclip_s1_finetuned.pt", map_location='cpu')
+    state_dict = torch.load(r"models/mobileclip_s1_finetuned.pt", map_location='cpu')
     model.load_state_dict(state_dict, strict=False)
     model.eval()
 
@@ -306,10 +306,3 @@ def get_clip_predict(crop_bytes):
     return norm_result
 
 
-with open(r"C:\Users\user\PycharmProjects\dendroscan-ml\test_image.jpg", "rb") as f:
-    img_bytes = f.read()
-
-# Прогоняем через модель
-result = get_clip_predict(img_bytes)
-
-print(result)
