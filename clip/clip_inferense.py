@@ -1,12 +1,10 @@
 import io
-from settings import logger
+
+from clip import mobileclip
 from PIL import Image
-from clip.CLIPFilter_2 import CLIPFilter
 from clip.mobileclip.translate import translation_dict
-from settings import logger
-import mobileclip
 import torch
-#from clip.mobileclip.translate import translation_dict, problem_translation_dict
+
 filters = {
     "tree species": [
         "A photo of a Norway maple (Acer platanoides) tree.",
