@@ -189,7 +189,7 @@ def process_image(
     defects = []
     for prob, idx in zip(top_probs, top_idx):
         prob = float(prob)
-        if prob < defect_threshold and len(defects) >= 1:
+        if prob < defect_threshold:
             break
         label = defect_texts[idx]
         ck = clean_key(label)
