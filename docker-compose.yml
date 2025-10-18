@@ -1,13 +1,8 @@
 services:
-  ml-service:
-    # Если необходимо запустить сервис из готового образа, то нужно
-    # закомментировать build и раскомментировать image
+  base-ml-service:
     build: .
-    #image: potapovjakov/dendroscan-ml:dev-torch
     env_file:
       - .env
-    ports:
-      - "8080:8000"
     restart: unless-stopped
     volumes:
       - ./models:/app/models
@@ -19,14 +14,25 @@ services:
       start_period: 40s
     networks:
       - app-network
+
+  ml-service-cpu:
+    extends:
+      service: base-ml-service
+    ports:
+      - "8080:8000"
+
+  ml-service:
+    extends:
+      service: base-ml-service
+    ports:
+      - "8081:8000"
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [ gpu ]
-
+              capabilities: [gpu]
 
 networks:
   app-network:
