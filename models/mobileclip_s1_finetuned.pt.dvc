@@ -1,0 +1,5 @@
+outs:
+- md5: a482dc4fc9974eabc639f77b5231a473
+  size: 339949237
+  hash: md5
+  path: mobileclip_s1_finetuned.pt
