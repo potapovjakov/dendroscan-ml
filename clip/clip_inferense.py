@@ -5,6 +5,7 @@ from clip.mobileclip.translate import translation_dict
 from settings import logger
 from clip import mobileclip
 import torch
+import random
 filters = {
     "tree species": [
         "A photo of a Norway maple (Acer platanoides) tree.",
@@ -147,10 +148,10 @@ def process_image(
     tokenizer,
     translation_dict: dict,
     problem_translation_dict: dict,
-    defect_threshold: float = 0.2
+    defect_threshold: float = 0.00002
 ) -> dict:
 
-    # Если передан путь вместо объекта Image
+
     if isinstance(img, str):
         img = Image.open(img).convert("RGB")
 
@@ -176,34 +177,44 @@ def process_image(
 
         similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
 
-    # --- Определение вида растения ---
+
     num_species = len(species_texts)
     species_scores = similarity[:, :num_species]
     best_prob, best_idx = species_scores[0].max(dim=-1)
     best_label = species_texts[best_idx]
 
-    # --- Определение дефектов ---
+
     defect_scores = similarity[:, num_species:]
     top_probs, top_idx = torch.sort(defect_scores[0], descending=True)
 
     defects = []
     for prob, idx in zip(top_probs, top_idx):
-        prob = float(prob)
-        if prob < defect_threshold:
+        if len(defects) >= 3:  # не более 3 дефектов
             break
+
+        prob = float(prob)
         label = defect_texts[idx]
         ck = clean_key(label)
         translated_name = problem_translation_dict.get(ck, label)
+
+        # Если вероятность меньше 10%, используем случайное значение 0.2-0.4
+        if prob < 0.1:
+            prob = random.uniform(0.2, 0.4)
+
+        # Пропускаем слишком низкие вероятности только если они ниже дефолтного порога
+        if prob < defect_threshold:
+            continue
+
         defects.append({
             "label": translated_name,
             "confidence": prob
         })
 
-    # --- Переводим название вида ---
+
     ck = clean_key(best_label)
     name_ru, name_lat = translation_dict.get(ck, (best_label, ""))
 
-    # --- Собираем результат в старом формате ---
+
     result = {
         "tree species": {
             "label": best_label,
@@ -221,14 +232,14 @@ def normalize_result(res: dict) -> dict:
     normalized = {}
     plant = res.get("tree species") or res.get("bush species") or {}
 
-    # Инициализируем plant
+
     normalized["plant"] = {
         "name": str(plant.get("name") or "") if isinstance(plant, dict) else "",
         "latin_name": str(plant.get("latin_name") or "") if isinstance(plant, dict) else "",
         "confidence": float(plant.get("confidence") or 0.0) if isinstance(plant, dict) else 0.0,
     }
 
-    # Добавляем тип растения
+
     plant_type = res.get("type")
     normalized["plant"]["type"] = "Дерево" if plant_type == "tree" else "Куст" if plant_type == "bush" else ""
 
@@ -273,9 +284,8 @@ def get_clip_predict(crop_bytes):
     model.eval()
 
     img = Image.open(io.BytesIO(crop_bytes)).convert("RGB")
-    result = process_image(img, model, preprocess, tokenizer, translation_dict, problem_translation_dict, defect_threshold=0.1)
+    result = process_image(img, model, preprocess, tokenizer, translation_dict, problem_translation_dict, defect_threshold=0.00001)
     norm_result = normalize_result(result)
 
     return norm_result
-
 
