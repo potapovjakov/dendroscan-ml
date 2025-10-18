@@ -225,68 +225,41 @@ def normalize_result(res: dict) -> dict:
     normalized["plant"] = {
         "name": str(plant.get("name") or "") if isinstance(plant, dict) else "",
         "latin_name": str(plant.get("latin_name") or "") if isinstance(plant, dict) else "",
-        "confidence": float(plant.get("confidence") or 0.0)
-        if isinstance(plant, dict)
-        else 0.0,
+        "confidence": float(plant.get("confidence") or 0.0) if isinstance(plant, dict) else 0.0,
     }
 
     # Добавляем тип растения
     plant_type = res.get("type")
-    if plant_type == "tree":
-        normalized["plant"]["type"] = "Дерево"
-    elif plant_type == "bush":
-        normalized["plant"]["type"] = "Куст"
-    else:
-        normalized["plant"]["type"] = ""
+    normalized["plant"]["type"] = "Дерево" if plant_type == "tree" else "Куст" if plant_type == "bush" else ""
 
     defects = []
     healthy_states = ["здоровый куст", "прямое дерево"]
 
-    for key in [
-        "tree problems",
-        "bush problems",
-        "bush dry branches",
-        "tree is leaning",
-    ]:
+    for key in ["tree problems", "bush problems", "bush dry branches", "tree is leaning"]:
         val = res.get(key)
         logger.info(f"Processing key '{key}': {val}")
-
         if not val:
             continue
 
-        if isinstance(val, dict):
-            name = str(val.get("name") or val.get("problem") or val.get("label") or "")
-            if name not in healthy_states:
-                confidence = float(val.get("confidence") or 0.0)
-                defects.append({"name": name, "confidence": confidence})
-                if name == "":
-                    logger.warning(f"Defect in '{key}' has empty name: {val}")
+        items = val if isinstance(val, list) else [val]
 
-        elif isinstance(val, list):
-            for v in val:
-                if isinstance(v, dict):
-                    name = str(v.get("name") or v.get("problem") or v.get("label") or "")
+        for v in items:
+            name = ""
+            confidence = 0.0
+
+            if isinstance(v, dict):
+                name = str(v.get("name") or v.get("problem") or v.get("label") or "")
+                if name:
                     confidence = float(v.get("confidence") or 0.0)
-                    if name not in healthy_states:
-                        defects.append({"name": name, "confidence": confidence})
-                        if name == "":
-                            logger.warning(f"Defect in '{key}' list has empty name: {v}")
-                else:
-                    name = str(v or "")
-                    if name not in healthy_states:
-                        defects.append({"name": name, "confidence": 0.0})
-                        if name == "":
-                            logger.warning(f"Defect in '{key}' list has empty name: {v}")
+            else:
+                name = str(v or "")
 
-        else:
-            name = str(val or "")
-            if name not in healthy_states:
-                defects.append({"name": name, "confidence": 0.0})
-                if name == "":
-                    logger.warning(f"Defect in '{key}' has empty name: {val}")
+            if name and name not in healthy_states:
+                defects.append({"name": name, "confidence": confidence})
+            elif not name:
+                logger.warning(f"Defect in '{key}' has empty name: {v}")
 
-    normalized["plant"]["defects"] = defects or []
-
+    normalized["plant"]["defects"] = defects
     logger.info(f"Normalized result: {normalized}")
     return normalized
 
