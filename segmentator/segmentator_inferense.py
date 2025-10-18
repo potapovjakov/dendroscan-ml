@@ -57,8 +57,8 @@ class ObjectDetector:
             verbose: вывод информации о процессе
         '''
         # Проверка переменных INF_IOU и INF_CONF
-        default_iou = getattr(self, INF_IOU, 0.6)
-        default_conf = getattr(self, INF_CONF, 0.6)
+        #default_iou = getattr(self, INF_IOU, 0.6)
+        #default_conf = getattr(self, INF_CONF, 0.6)
 
         iou = iou if iou is not None else default_iou
         conf = conf if conf is not None else default_conf
@@ -288,34 +288,25 @@ class ObjectDetector:
 #         assert type(obj["class_name"]) == str
 #         assert type(obj["bbox"]) == list
 
-# Пример использования
-# if __name__ == '__main__':
+if __name__ == '__main__':
+    detector = ObjectDetector('../models/best.pt')
+    detector.predict(r"C:\Users\user\PycharmProjects\dendroscan-ml\test_image.jpg")
+    logger.info(f"Список ID объектов: {detector.get_object_ids()}")
 
+    with open(r"C:\Users\user\PycharmProjects\dendroscan-ml\test_image.jpg", 'rb') as f:
+        image_bytes = f.read()
 
+    detector.predict(image_bytes)
+    objects_with_crops = detector.get_objects_with_crops()
+    logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
 
+    for obj in objects_with_crops:
+        with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
+            f.write(obj['img_crop_bytes'])
+        logger.info(f"Сохранен объект {obj['id']}: {obj['class_name']}")
 
-    # detector = ObjectDetector('../models/best.pt')
-    #
-    # # Загрузка из файла
-    # detector.predict('test_image.jpeg')
-    # logger.info(f"Список ID объектов: {detector.get_object_ids()}")
-    #
-    # # Загрузка из bytes
-    # with open('test_image.jpeg', 'rb') as f:
-    #     image_bytes = f.read()
-    #
-    # detector.predict(image_bytes)
-    # objects_with_crops = detector.get_objects_with_crops()
-    # logger.info(f"Найдено объектов с кропами: {len(objects_with_crops)}")
-    # # Сохранение кропов в файлы
-    # for obj in objects_with_crops:
-    #     with open(f"object_{obj['id']}_{obj['class_name']}.jpg", "wb") as f:
-    #         f.write(obj['img_crop_bytes'])
-    #     logger.info(f"Сохранен объект {obj['id']}: {obj['class_name']}")
-    #
-    # # Получение размеченного изображения в bytes
-    # annotated_image_bytes = detector.get_annotated_image_bytes()
-    # with open("annotated_image.jpg", "wb") as f:
-    #     f.write(annotated_image_bytes)
-    #
-    # detector.show_results()
+    annotated_image_bytes = detector.get_annotated_image_bytes()
+    with open("annotated_image.jpg", "wb") as f:
+        f.write(annotated_image_bytes)
+
+    detector.show_results()
