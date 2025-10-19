@@ -208,7 +208,6 @@ def normalize_result(res: dict) -> dict:
     normalized = {}
     plant = res.get("tree species") or res.get("bush species") or {}
 
-    # Инициализируем plant как словарь
     normalized["plant"] = {
         "name": plant.get("name", "") if isinstance(plant, dict) else "",
         "latin_name": plant.get("latin_name", "") if isinstance(plant, dict) else "",
@@ -217,7 +216,6 @@ def normalize_result(res: dict) -> dict:
         else 0.0,
     }
 
-    # Добавляем тип растения
     plant_type = res.get("type")
     if plant_type == "tree":
         normalized["plant"]["type"] = "Дерево"
@@ -227,6 +225,13 @@ def normalize_result(res: dict) -> dict:
         normalized["plant"]["type"] = ""
 
     defects = []
+    skip_names = [
+        "здоровый куст",
+        "прямое дерево",
+        "слегка наклонное дерево",
+        "переросший/неподрезанный куст",
+    ]
+
     for key in [
         "tree problems",
         "bush problems",
@@ -239,34 +244,29 @@ def normalize_result(res: dict) -> dict:
         if not val:
             continue
 
-        # Проверяем на здоровые состояния
-        if isinstance(val, dict) and val.get("name") in ["здоровый куст", "прямое дерево"]:
+        if isinstance(val, dict) and val.get("name") in skip_names:
             continue
-        if isinstance(val, str) and val in ["здоровый куст", "прямое дерево"]:
+        if isinstance(val, str) and val in skip_names:
             continue
 
         if isinstance(val, list):
             for v in val:
                 if isinstance(v, dict):
-                    # Получаем имя из возможных полей
                     name = v.get("name") or v.get("problem") or v.get("label", "")
-                    # Пропускаем здоровые состояния
-                    if name in ["здоровый куст", "прямое дерево"]:
+                    if name in skip_names:
                         continue
                     defects.append({
                         "name": name,
                         "confidence": float(v.get("confidence", 0.0)),
                     })
                 else:
-                    # Пропускаем здоровые состояния для строк
-                    if str(v) in ["здоровый куст", "прямое дерево"]:
+                    if str(v) in skip_names:
                         continue
                     defects.append({"name": str(v), "confidence": 0.0})
 
         elif isinstance(val, dict):
             name = val.get("name") or val.get("problem") or val.get("label", "")
-            # Пропускаем здоровые состояния
-            if name in ["здоровый куст", "прямое дерево"]:
+            if name in skip_names:
                 continue
             defects.append({
                 "name": name,
@@ -274,8 +274,7 @@ def normalize_result(res: dict) -> dict:
             })
 
         else:
-            # Пропускаем здоровые состояния для строк
-            if str(val) in ["здоровый куст", "прямое дерево"]:
+            if str(val) in skip_names:
                 continue
             defects.append({"name": str(val), "confidence": 0.0})
 
@@ -291,3 +290,5 @@ def get_clip_predict(crop_bytes):
     result = process_image(img, clf, translation_dict, problem_translation_dict)
     norm_result = normalize_result(result)
     return norm_result
+
+
