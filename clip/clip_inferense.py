@@ -1,10 +1,9 @@
 import io
-from settings import logger
 from PIL import Image
-from clip.CLIPFilter_2 import CLIPFilter
 from clip.mobileclip.translate import translation_dict
 from settings import logger
-
+from clip import mobileclip
+import torch
 filters = {
     "tree species": [
         "A photo of a Norway maple (Acer platanoides) tree.",
@@ -142,80 +141,95 @@ def clean_key(s: str) -> str:
 
 def process_image(
     img,
-        clf,
-        translation_dict: dict,
-        problem_translation_dict: dict,
+    model,
+    preprocess,
+    tokenizer,
+    translation_dict: dict,
+    problem_translation_dict: dict,
+    defect_threshold: float = 0.2
 ) -> dict:
-    result = clf.process(img)
 
-    translated_result = {}
-    for key, value in result.items():
-        if key == "type":
-            translated_result[key] = value
-            continue
+    # Если передан путь вместо объекта Image
+    if isinstance(img, str):
+        img = Image.open(img).convert("RGB")
 
-        if isinstance(value, list):
-            translated_result[key] = []
-            for v in value:
-                if isinstance(v, dict):
-                    label = v["label"]
-                    conf = v["confidence"]
-                    ck = clean_key(label)
-                    translated_result[key].append(
-                        {
-                            "problem": problem_translation_dict.get(ck, label),
-                            "confidence": conf,
-                        }
-                    )
-                else:
-                    # fallback если вернулась строка
-                    translated_result[key].append(
-                        problem_translation_dict.get(clean_key(v), v)
-                    )
+    image_input = preprocess(img).unsqueeze(0)
 
-        elif isinstance(value, dict):
-            label = value["label"]
-            conf = value["confidence"]
-            ck = clean_key(label)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    image_input = image_input.to(device)
 
-            if key in ["tree species", "bush species"]:
-                name_ru, name_lat = translation_dict.get(ck, (label, ""))
-                translated_result[key] = {
-                    "name": name_ru,
-                    "latin_name": name_lat,
-                    "confidence": conf,
-                }
+    # Разделяем классы
+    species_texts = list(translation_dict.keys())
+    defect_texts = list(problem_translation_dict.keys())
+    all_texts = species_texts + defect_texts
 
-            elif ck in problem_translation_dict:
-                translated_result[key] = {
-                    "name": problem_translation_dict[ck],
-                    "confidence": conf,
-                }
+    text_inputs = tokenizer(all_texts).to(device)
 
-            else:
-                translated_result[key] = {"label": label, "confidence": conf}
+    with torch.no_grad():
+        image_features = model.encode_image(image_input)
+        text_features = model.encode_text(text_inputs)
 
-        elif isinstance(value, str):
-            ck = clean_key(value)
-            translated_result[key] = translation_dict.get(ck, (value, ""))
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
-        else:
-            translated_result[key] = None
+        similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
 
-    return translated_result
+    # --- Определение вида растения ---
+    num_species = len(species_texts)
+    species_scores = similarity[:, :num_species]
+    best_prob, best_idx = species_scores[0].max(dim=-1)
+    best_label = species_texts[best_idx]
+
+    # --- Определение дефектов ---
+    defect_scores = similarity[:, num_species:]
+    top_probs, top_idx = torch.sort(defect_scores[0], descending=True)
+
+    defects = []
+    for prob, idx in zip(top_probs, top_idx):
+        prob = float(prob)
+        if prob < defect_threshold and len(defects) >= 1:
+            break
+        label = defect_texts[idx]
+        ck = clean_key(label)
+        translated_name = problem_translation_dict.get(ck, label)
+        defects.append({
+            "label": translated_name,
+            "confidence": prob
+        })
+
+    # --- Переводим название вида ---
+    ck = clean_key(best_label)
+    name_ru, name_lat = translation_dict.get(ck, (best_label, ""))
+
+    # --- Собираем результат в старом формате ---
+    result = {
+        "tree species": {
+            "label": best_label,
+            "name": name_ru,
+            "latin_name": name_lat,
+            "confidence": float(best_prob)
+        },
+        "tree problems": defects,
+        "type": "tree"
+    }
+
+    return result
 
 def normalize_result(res: dict) -> dict:
     normalized = {}
     plant = res.get("tree species") or res.get("bush species") or {}
 
+    # Инициализируем plant
     normalized["plant"] = {
-        "name": plant.get("name", "") if isinstance(plant, dict) else "",
-        "latin_name": plant.get("latin_name", "") if isinstance(plant, dict) else "",
-        "confidence": float(plant.get("confidence", 0.0))
+        "name": str(plant.get("name") or "") if isinstance(plant, dict) else "",
+        "latin_name": str(plant.get("latin_name") or "") if isinstance(plant, dict) else "",
+        "confidence": float(plant.get("confidence") or 0.0)
         if isinstance(plant, dict)
         else 0.0,
     }
 
+    # Добавляем тип растения
     plant_type = res.get("type")
     if plant_type == "tree":
         normalized["plant"]["type"] = "Дерево"
@@ -225,12 +239,7 @@ def normalize_result(res: dict) -> dict:
         normalized["plant"]["type"] = ""
 
     defects = []
-    skip_names = [
-        "здоровый куст",
-        "прямое дерево",
-        "слегка наклонное дерево",
-        "переросший/неподрезанный куст",
-    ]
+    healthy_states = ["здоровый куст", "прямое дерево"]
 
     for key in [
         "tree problems",
@@ -239,56 +248,58 @@ def normalize_result(res: dict) -> dict:
         "tree is leaning",
     ]:
         val = res.get(key)
-        logger.info(f"Processing {key}: {val}")
+        logger.info(f"Processing key '{key}': {val}")
 
         if not val:
             continue
 
-        if isinstance(val, dict) and val.get("name") in skip_names:
-            continue
-        if isinstance(val, str) and val in skip_names:
-            continue
+        if isinstance(val, dict):
+            name = str(val.get("name") or val.get("problem") or val.get("label") or "")
+            if name not in healthy_states:
+                confidence = float(val.get("confidence") or 0.0)
+                defects.append({"name": name, "confidence": confidence})
+                if name == "":
+                    logger.warning(f"Defect in '{key}' has empty name: {val}")
 
-        if isinstance(val, list):
+        elif isinstance(val, list):
             for v in val:
                 if isinstance(v, dict):
-                    name = v.get("name") or v.get("problem") or v.get("label", "")
-                    if name in skip_names:
-                        continue
-                    defects.append({
-                        "name": name,
-                        "confidence": float(v.get("confidence", 0.0)),
-                    })
+                    name = str(v.get("name") or v.get("problem") or v.get("label") or "")
+                    confidence = float(v.get("confidence") or 0.0)
+                    if name not in healthy_states:
+                        defects.append({"name": name, "confidence": confidence})
+                        if name == "":
+                            logger.warning(f"Defect in '{key}' list has empty name: {v}")
                 else:
-                    if str(v) in skip_names:
-                        continue
-                    defects.append({"name": str(v), "confidence": 0.0})
-
-        elif isinstance(val, dict):
-            name = val.get("name") or val.get("problem") or val.get("label", "")
-            if name in skip_names:
-                continue
-            defects.append({
-                "name": name,
-                "confidence": float(val.get("confidence", 0.0)),
-            })
+                    name = str(v or "")
+                    if name not in healthy_states:
+                        defects.append({"name": name, "confidence": 0.0})
+                        if name == "":
+                            logger.warning(f"Defect in '{key}' list has empty name: {v}")
 
         else:
-            if str(val) in skip_names:
-                continue
-            defects.append({"name": str(val), "confidence": 0.0})
+            name = str(val or "")
+            if name not in healthy_states:
+                defects.append({"name": name, "confidence": 0.0})
+                if name == "":
+                    logger.warning(f"Defect in '{key}' has empty name: {val}")
 
-    normalized["plant"]["defects"] = defects
-    logger.info(f"normalized result: {normalized}")
+    normalized["plant"]["defects"] = defects or []
 
+    logger.info(f"Normalized result: {normalized}")
     return normalized
 
 
 def get_clip_predict(crop_bytes):
-    clf = CLIPFilter("models/mobileclip_s1.pt", filters)
+    model, _, preprocess = mobileclip.create_model_and_transforms('mobileclip_s1', pretrained=None)
+    tokenizer = mobileclip.get_tokenizer('mobileclip_s1')
+
+    state_dict = torch.load("models/mobileclip_s1_finetuned.pt", map_location='cpu')
+    model.load_state_dict(state_dict, strict=False)
+    model.eval()
+
     img = Image.open(io.BytesIO(crop_bytes)).convert("RGB")
-    result = process_image(img, clf, translation_dict, problem_translation_dict)
+    result = process_image(img, model, preprocess, tokenizer, translation_dict, problem_translation_dict, defect_threshold=0.1)
     norm_result = normalize_result(result)
+
     return norm_result
-
-
